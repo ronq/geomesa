@@ -58,7 +58,7 @@
                 <include>org.codehaus.jackson:jackson-core-asl</include>
                 <include>org.codehaus.jackson:jackson-mapper-asl</include>
                 <include>org.geotools:gt-shapefile</include>
-                <include>org.geotools:gt-epsg-hsql</include>
+                <include>org.geotools:gt-epsg-wkt</include>
                 <include>org.scala-lang:scala-compiler</include>
                 <include>org.scala-lang:scala-library</include>
                 <include>org.scala-lang:scala-reflect</include>
