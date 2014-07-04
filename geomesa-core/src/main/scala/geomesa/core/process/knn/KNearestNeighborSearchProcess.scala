@@ -125,9 +125,9 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
     val distanceCalculator
     = new GeodeticDistanceCalc(theSearchFeature.getDefaultGeometryProperty.getValue.asInstanceOf[Geometry])
     val distanceVisitor = new GeodeticVisitor(distanceCalculator)
-    runKNNQuery(source,query,distanceVisitor,searchRadius, currentKNN)
+    runKNNQuery(source, query, distanceVisitor, searchRadius, currentKNN)
   }
-  def runKNNQuery(source: SimpleFeatureSource, query: Query, distanceVisitor:GeodeticVisitor, searchRadius: Float kNN: NearestNeighbors) = {
+  def runKNNQuery(source: SimpleFeatureSource, query: Query, distanceVisitor:GeodeticVisitor, searchRadius: Float, kNN: NearestNeighbors) = {
     kNN match {
       case null =>
     }
