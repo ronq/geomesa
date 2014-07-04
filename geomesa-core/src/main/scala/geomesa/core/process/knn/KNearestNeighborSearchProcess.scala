@@ -1,6 +1,6 @@
 package geomesa.core.process.knn
 
-import com.vividsolutions.jts.geom.GeometryFactory
+import com.vividsolutions.jts.geom.{Geometry, GeometryFactory}
 import geomesa.core.data.AccumuloFeatureCollection
 import geomesa.utils.geotools.Conversions._
 import org.apache.log4j.Logger
@@ -56,7 +56,6 @@ class KNearestNeighborSearchProcess {
     if(dataFeatures.isInstanceOf[ReTypingFeatureCollection]) {
       log.warn("WARNING: layer name in geoserver must match feature type name in geomesa")
     }
-
     val visitor = new KNNVisitor(inputFeatures, dataFeatures, numDesired, bufferDistance)
     dataFeatures.accepts(visitor, new NullProgressListener)
     visitor.getResult.asInstanceOf[KNNResult].results
@@ -96,10 +95,43 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
 
   def kNNSearch(source: SimpleFeatureSource, query: Query) = {
     log.info("Running Geomesa K-Nearest Neighbor Search on source type "+source.getClass.getName)
+    //query.setSortBy()
+    // we have numDesired
+    // we have the starting bufferRadius
+    // now we need to start a loop or a recursion
+    //     with the current bufferRadius, generate the query:
+    //                                      for now, it should be BBOX(sides of bufferRadius) and NOT old BBOX
+    //     run the query
+    //     pass the query results into the sorterClass
+    //     ask if we have k results:
+    //               if yes, get the largest distance:
+    //                                ensure that we have properly covered a search radius out to the largest distance
+    //                                           --> generate new query if not
+    //                                           --> done if yes
+    //               if no, generate a new query and begin again.
+
+
+
+   // for now, cycle through each of the inputFeatures
+   val inputList = inputFeatures.features.toList // the user should NOT be feeding in a large number of query points.
+   inputList.flatMap(anFeatureForSearch => runNewKNNQuery(source,query, anFeatureForSearch))
+
+
+
     val combinedFilter = ff.and(query.getFilter, dwithinFilters("meters"))
     source.getFeatures(combinedFilter)
   }
-
+  def runNewKNNQuery(source:SimpleFeatureSource, query: Query, theSearchFeature:SimpleFeature) = {
+    val distanceCalculator
+    = new GeodeticDistanceCalc(theSearchFeature.getDefaultGeometryProperty.getValue.asInstanceOf[Geometry])
+    val distanceVisitor = new GeodeticVisitor(distanceCalculator)
+    runKNNQuery(source,query,distanceVisitor,searchRadius, currentKNN)
+  }
+  def runKNNQuery(source: SimpleFeatureSource, query: Query, distanceVisitor:GeodeticVisitor, searchRadius: Float kNN: NearestNeighbors) = {
+    kNN match {
+      case null =>
+    }
+  }
   def dwithinFilters(requestedUnit: String) = {
     import geomesa.utils.geotools.Conversions.RichGeometry
     import scala.collection.JavaConversions._
