@@ -9,6 +9,12 @@ import org.opengis.feature.simple.SimpleFeature
 import scala.collection.mutable
 import scala.collection.mutable.PriorityQueue
 
+/**
+ *  The KNN searched from the July 4th hacking
+ * @param pt
+ * @param fs
+ * @param q
+ */
 class KNNSearcher(pt: Point, fs: FeatureSource, q: Query) {
 
 

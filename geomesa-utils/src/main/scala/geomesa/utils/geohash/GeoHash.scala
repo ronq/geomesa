@@ -68,6 +68,8 @@ case class GeoHash private(x: Double,
 
   def next(): GeoHash =  GeoHash(GeoHash.next(bitset, prec), prec)
 
+
+
   override def equals(obj: Any): Boolean = obj match {
     case that: GeoHash => this.bitset == that.bitset && this.prec == that.prec
     case _ => false
@@ -139,6 +141,36 @@ object GeoHash extends Logging {
 
     encode(lonIndex, latIndex, lonDelta, latDelta, prec)
   }
+  // return all GeoHashes of the same precision that are in contact with this one,
+  def touching(gh: GeoHash): Seq[GeoHash] = {
+      val thisLoc = gh.getPoint
+      val thisPrec = gh.prec
+      val thisLatPrec = latitudeDeltaForPrecision(thisPrec)
+      val thisLonPrec = longitudeDeltaForPrecision(thisPrec)
+      // get the precision (is lat and lon degrees the same?)
+      // get the GeoHashes that lie -1<x<1 and -1<y<1 from this one,
+      // treating the bonds at the poles and antimeridian correctly
+
+    val shiftPattern = for {
+      i <- List(-1,0,1)
+        j <- List(-1,0,1)
+      } yield (i,j)
+    val newLatitudes = shiftPattern.map{(x,y) => (2.0*thisLonPrec*x, 2.0*thisLatPrec*y)}
+
+
+
+  def touchingLatitudes(gh:GeoHash, delta:Double): List[Double] = {
+    val currentLat = gh.getPoint.y
+    val relativeShifts = List(-2.0, 0.0, 2.0)
+    for {
+      relativeShift <- relativeShifts
+      proposedLat = currentLat relativeShift * delta
+      if (math.abs(proposedLat) > latBounds.high)
+    }
+  }
+
+  def shiftLon(delta): Int ={}
+
 
   def covering(ll: GeoHash, ur: GeoHash, prec: Int = 25) = {
     checkPrecision(prec)
