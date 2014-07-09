@@ -18,7 +18,7 @@ package geomesa.utils.geohash
 
 import com.vividsolutions.jts.geom.{Point, Coordinate, PrecisionModel, GeometryFactory}
 import scala.collection.BitSet
-import scala.collection.immutable.{BitSet => IBitSet, NumericRange}
+import scala.collection.immutable.{BitSet => IBitSet}
 import com.typesafe.scalalogging.slf4j.Logging
 
 /**
@@ -67,8 +67,6 @@ case class GeoHash private(x: Double,
   def contains(gh: GeoHash): Boolean = prec <= gh.prec && bitset.subsetOf(gh.bitset)
 
   def next(): GeoHash =  GeoHash(GeoHash.next(bitset, prec), prec)
-
-
 
   override def equals(obj: Any): Boolean = obj match {
     case that: GeoHash => this.bitset == that.bitset && this.prec == that.prec
@@ -141,52 +139,6 @@ object GeoHash extends Logging {
 
     encode(lonIndex, latIndex, lonDelta, latDelta, prec)
   }
-  // return all GeoHashes of the same precision that are in contact with this one,
-  def touching(gh: GeoHash): Seq[GeoHash] = {
-      val thisLoc = gh.getPoint
-      val thisPrec = gh.prec
-      val thisLatPrec = latitudeDeltaForPrecision(thisPrec)
-      val thisLonPrec = longitudeDeltaForPrecision(thisPrec)
-      // get the precision (is lat and lon degrees the same?)
-      // get the GeoHashes that lie -1<x<1 and -1<y<1 from this one,
-      // treating the bonds at the poles and antimeridian correctly
-      // this needs to filter out the (0,0) case
-      val shiftPattern = for {
-        i <- List(-1,0,1)
-          j <- List(-1,0,1)
-                             } yield (i,j)
-      // get a list of new coordinates
-      // NOTE THAT BLINDY JUMPING BY TWICE THE PRECISION IS NOT GOING TO PLACE
-      // the position squarely into the next geohash.
-      // I need to check that there are no overshoots.
-      val newCoordShifts = shiftPattern.map{ shift => (2.0*thisLonPrec*x, 2.0*thisLatPrec*y)}
-      // apply the coordinate shifts to the center point
-      // if there are any that extend to the pole, I need to wrap around the pole completely
-      // by taking the original latitude and cycling through all longs
-      // if there are any that jump over the antimeridian, I need to
-      // just flip the sign of the longitude.
-
-      def handlePoles(newPoint: Point): List[Point] = {
-        if poleCrossing(newPoint) {
-              generatePoleWrap(thisPoint, thisPrec)  // we actually don't care if we've also jumped over the meridian in this case
-        }
-        else if antimeridianCrossing(newPoint)
-        else
-          List(newPoint)
-      }
-      def poleCrossing(aPoint: Point): Boolean = math.abs(aPoint.getY) > 90
-      def antimeridianCrossing(aPoint: Point): Boolean = math.abs(aPoint.getX) > 180
-      def generatePoleWrap(aPoint: Point, aPrec: Int): List[Point] = {
-        val aLat = aPoint.getY // extract  the latitude of the original point -- it will be used for the wrap
-        val lonDelta = lonDeltaMap(aPrec)// get a array of all longitude centers
-        //powersOf2Map(aPrec)//
-        // I need to confirm that this works.
-        val allLongtitudes = NumericRange(-180+lonDelta,180.-lonDelta,2.*lonDelta)
-        // generate the list
-      }
-  }
-
-
 
   def covering(ll: GeoHash, ur: GeoHash, prec: Int = 25) = {
     checkPrecision(prec)
