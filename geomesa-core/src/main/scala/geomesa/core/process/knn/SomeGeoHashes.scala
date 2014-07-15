@@ -14,7 +14,7 @@ import EnrichmentPatch._
  * Later, this will switch to the Touching GeoHash Iterator
  */
 object SomeGeoHashes {
-  def apply(centerPoint:SimpleFeature, distanceGuess: Double) ={
+  def apply(centerPoint:SimpleFeature, distanceGuess: Double): SomeGeoHashes = {
 
      // take the center point and extract some silly bounds.....
      val maxDistanceGuess = 10 * distanceGuess
@@ -62,7 +62,6 @@ class SomeGeoHashes(val aFeatureForSearch:SimpleFeature,
     }
     else throw new NoSuchElementException("No more geohashes available in PriorityQueue")
   }
-
 }
 
 object EnrichmentPatch{
