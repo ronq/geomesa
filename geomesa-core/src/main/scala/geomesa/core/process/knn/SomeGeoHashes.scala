@@ -22,7 +22,7 @@ object SomeGeoHashes {
      val bBox = TwoGeoHashBoundingBox(llGH, urGH)
      val ghIt = new BoundingBoxGeoHashIterator(bBox)
      // feed the center point and iterator to the class, and enqueue the first GH.
-     new SomeGeoHashes(centerPoint, ghIt, maxDistanceGuess).enqueue(ghIt.next())
+     new SomeGeoHashes(centerPoint, ghIt, maxDistanceGuess) {enqueue(ghIt.next())}
   }
 }
 class SomeGeoHashes(val aFeatureForSearch:SimpleFeature,
@@ -34,34 +34,20 @@ class SomeGeoHashes(val aFeatureForSearch:SimpleFeature,
   def distanceCalc(gh:GeoHash) = aFeatureForSearch.point.distance(GeohashUtils.getGeohashGeom(gh))
   // this must be a var since it has state
   var statefulMaxRadius = maxRadius // primed with the maximum radius on input, which is a sanity check
-  val statefulMinRadius = 0.0
   // removes GeoHashes that are further than a certain distance from the aFeatureForSearch
-  def statefulDistanceFilter(gh:GeoHash):Boolean = {distanceCalc(gh) < statefulMaxRadius  &&
-                                                    distanceCalc(gh) > statefulMinRadius }
+  def statefulDistanceFilter(gh:GeoHash):Boolean = {distanceCalc(gh) < statefulMaxRadius }
 
+  // provides external interface to set the maximum radius
   def mutateMaxRadius(radiusCandidate: Double):Unit = if (radiusCandidate < statefulMaxRadius)
                      statefulMaxRadius = radiusCandidate // this has code smell
-  def hasNext: Boolean = this.nonEmpty
-  // this should get the first element,
-  // then find the touching GeoHashes
-  // and for each touching GeoHash, add it IF the distance is LARGER than the
-  // new closest geohash
-  // if the distance is smaller, log a warning!
-  def next: GeoHash = {
-    if (this.nonEmpty) {
-      // get the current return element out of the PriorityQueue
-      // this is done here since we may want to use it to do filtering on the GHIterator
-      val retVal = this.dequeue()
-      // access the GHIterator
-      if (theGHIterator.hasNext()) {
-        // stream in the next value(s) from the iterator. We may need retVal to generate this
-        val theNext = theGHIterator.find{gh:GeoHash =>statefulDistanceFilter(gh)}
-        theNext.foreach{nextGH => this.enqueue(nextGH)} // load them into the PQ
-      }
-      retVal
-    }
-    else throw new NoSuchElementException("No more geohashes available in PriorityQueue")
-  }
+  // returns the next element in the queue, and enqueues the next entry in the iterator
+  // this will return None if no elements in the queue pass the filter
+  def next: Option[GeoHash] =
+    for {
+      newGH  <- this.find{statefulDistanceFilter}            // get the next element in the queue that passes the filter
+      nextGH <- theGHIterator.find{statefulDistanceFilter}   // if that was successful, get the same in the iterator
+      _      <- this.enqueue(nextGH)                         // if that was successful, add it to the queue
+    } yield newGH
 }
 
 object EnrichmentPatch{
