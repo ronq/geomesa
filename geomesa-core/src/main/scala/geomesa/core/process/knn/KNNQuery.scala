@@ -8,7 +8,7 @@ import org.geotools.geometry.jts.ReferencedEnvelope
 import org.opengis.feature.simple.SimpleFeature
 
 /**
- *  This object contains the main algorithm for the GeoHash-based iterative KNN search.
+ * This object contains the main algorithm for the GeoHash-based iterative KNN search.
  */
 
 
@@ -16,17 +16,17 @@ object KNNQuery {
   /**
    * Method to kick off a new KNN query about aFeatureForSearch
    */
-  def runNewKNNQuery(source:SimpleFeatureSource,
+  def runNewKNNQuery(source: SimpleFeatureSource,
                      query: Query,
                      numDesired: Int,
                      searchRadius: Double,
-                     aFeatureForSearch: SimpleFeature )
+                     aFeatureForSearch: SimpleFeature)
   : NearestNeighbors = {
     // setup the GH iterator -- it requires the search point and the searchRadius
     // use the horrible implementation first
-    val geoHashPQ   = SomeGeoHashes(aFeatureForSearch, searchRadius)
+    val geoHashPQ = SomeGeoHashes(aFeatureForSearch, searchRadius)
     // setup the stateful object for record keeping
-    val searchStatus = KNNSearchStatus(numDesired, geoHashPQ.statefulMaxRadius )
+    val searchStatus = KNNSearchStatus(numDesired, geoHashPQ.statefulMaxRadius)
     // begin the search with the recursive method
     runKNNQuery(source, query, geoHashPQ, aFeatureForSearch, searchStatus)
   }
@@ -37,9 +37,9 @@ object KNNQuery {
   def runKNNQuery(source: SimpleFeatureSource,
                   query: Query,
                   ghPQ: SomeGeoHashes,
-                  queryFeature:SimpleFeature,
+                  queryFeature: SimpleFeature,
                   status: KNNSearchStatus)
-    : NearestNeighbors   = {
+  : NearestNeighbors = {
     import geomesa.utils.geotools.Conversions.toRichSimpleFeatureIterator
     // filter the ghPQ if we've already found kNN
     if (status.foundK) ghPQ.mutateMaxRadius(status.currentMaxRadius)
@@ -52,9 +52,7 @@ object KNNQuery {
         status.updateNum(newFeatures.length) // increment number found
         val newNeighbors = new NearestNeighbors(queryFeature, status.numDesired) ++= newFeatures
         // apply filter to ghPQ if we've found k neighbors
-        if (status.foundK) newNeighbors.maxDistance.foreach {
-          status.updateDistance
-        }
+        if (status.foundK) newNeighbors.maxDistance.foreach { status.updateDistance }
         newNeighbors ++= runKNNQuery(source, query, ghPQ, queryFeature, status)
     }
   }
@@ -66,10 +64,9 @@ object KNNQuery {
     // setup a new BBOX filter to add to the original suite
     val geomProp = ff.property(source.getSchema.getGeometryDescriptor.getName)
     val newGHEnv = new ReferencedEnvelope(gh.bbox, oldQuery.getCoordinateSystem)
-    val newGHFilter = ff.bbox(geomProp,newGHEnv)
+    val newGHFilter = ff.bbox(geomProp, newGHEnv)
     // could ALSO apply a dwithin filter if k neighbors have been found.
     // copy the original query before mutation, then AND the new GeoHash filter with the original filter
-    new Query(oldQuery) { setFilter(ff.and(oldQuery.getFilter,newGHFilter)) }
+    new Query(oldQuery) { setFilter(ff.and(oldQuery.getFilter, newGHFilter)) }
   }
-
 }
