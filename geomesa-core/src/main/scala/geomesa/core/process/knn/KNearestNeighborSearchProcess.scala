@@ -1,6 +1,7 @@
 package geomesa.core.process.knn
 
-import com.vividsolutions.jts.geom.{Geometry, GeometryFactory}
+import collection.JavaConverters._
+import com.vividsolutions.jts.geom.GeometryFactory
 import geomesa.core.data.AccumuloFeatureCollection
 import geomesa.utils.geotools.Conversions._
 import org.apache.log4j.Logger
@@ -13,7 +14,6 @@ import org.geotools.feature.visitor.{CalcResult, FeatureCalc, AbstractCalcResult
 import org.geotools.process.factory.{DescribeParameter, DescribeResult, DescribeProcess}
 import org.geotools.util.NullProgressListener
 import org.opengis.feature.Feature
-import org.opengis.feature.simple.SimpleFeature
 import org.opengis.filter.Filter
 
 @DescribeProcess(
@@ -84,16 +84,9 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
   var manualFilter: Filter = _
   val manualVisitResults = new DefaultFeatureCollection(null, dataFeatures.getSchema)
 
-  // Called for non AccumuloFeactureCollections - here we use degrees for our filters
-  // since we are manually evaluating them.
-  def visit(feature: Feature): Unit = {
-    manualFilter = Option(manualFilter).getOrElse(dwithinFilters("degrees"))
-    val sf = feature.asInstanceOf[SimpleFeature]
-
-    if(manualFilter.evaluate(sf)) {
-      manualVisitResults.add(sf)
-    }
-  }
+  // called for non AccumuloFeatureCollections
+  // does this warrant an actual implementation?
+  def visit(feature: Feature): Unit = {}
 
   var resultCalc: KNNResult = new KNNResult(manualVisitResults)
 
@@ -101,42 +94,35 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
 
   def setValue(r: SimpleFeatureCollection) = resultCalc = KNNResult(r)
 
-  /** the main KNN search method
+  /** The KNN-Search interface for the WPS process.
     *
-    * @param source
-    * @param query
-    * @return
+    * Takes as input a Query and SimpleFeatureSource, in addition to
+    *  inputFeatures which define one or more SimpleFeatures for which to find KNN of each
+    *
+    *  Note that the results are NOT de-duplicated!
+    *
     */
-
   def kNNSearch(source: SimpleFeatureSource, query: Query) = {
     log.info("Running Geomesa K-Nearest Neighbor Search on source type "+source.getClass.getName)
-    //query.setSortBy()
-    // we have numDesired
-    // we have the starting bufferRadius
-    // now we need to start a loop or a recursion
-    //     with the current bufferRadius, generate the query:
-    //                                      for now, it should be BBOX(sides of bufferRadius) and NOT old BBOX
-    //     run the query
-    //     pass the query results into the sorterClass
-    //     ask if we have k results:
-    //               if yes, get the largest distance:
-    //                                ensure that we have properly covered a search radius out to the largest distance
-    //                                           --> generate new query if not
-    //                                           --> done if yes
-    //               if no, generate a new query and begin again.
 
-
-
-
-   // for now, cycle through each of the inputFeatures
-   val inputList = inputFeatures.features.toList // the user should NOT be feeding in a large number of query points.
-    // flatMap over the inputList --- each runNewKNNQuery should yield a FeatureCollection of KNN for that point.
-   inputList.flatMap {anFeatureForSearch => runNewKNNQuery(source, query, numDesired, bufferDistance, anFeatureForSearch )}
-
-    //val combinedFilter = ff.and(query.getFilter, dwithinFilters("meters"))
-    source.getFeatures(combinedFilter)
+   // collection approach to creating a new feature collection, and filling it with the results of
+   // a KNN search for each feature in the inputFeatures
+   // comment out as this requires multiple lines
+   /**
+    new DefaultFeatureCollection {
+       inputFeatures.features.map {
+         aFeatureForSearch =>addAll(
+           KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch ).dequeueAll.asJava )
+       } }
+    **/
+   // for-loop implementation
+   for {
+     resultsCollection:DefaultFeatureCollection <- new DefaultFeatureCollection()
+     aFeatureForSearch <- inputFeatures.features
+     theKNN = KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch ).dequeueAll.asJava
+     _      <- resultsCollection.addAll(theKNN)
+   } yield resultsCollection
   }
-
 }
 
 case class KNNResult(results: SimpleFeatureCollection) extends AbstractCalcResult

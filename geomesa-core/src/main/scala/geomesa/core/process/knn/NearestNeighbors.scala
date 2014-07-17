@@ -1,6 +1,5 @@
 package geomesa.core.process.knn
 
-
 import com.vividsolutions.jts.geom.Geometry
 import geomesa.utils.geotools.Conversions.RichSimpleFeature
 import org.opengis.feature.simple.SimpleFeature
