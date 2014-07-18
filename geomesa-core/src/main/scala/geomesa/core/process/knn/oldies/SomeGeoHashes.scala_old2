@@ -15,7 +15,7 @@ import scala.collection.mutable
  * Later, this will switch to the Touching GeoHash Iterator
  */
 object SomeGeoHashes {
-  def apply(centerPoint: SimpleFeature, distanceGuess: Double) = {
+  def apply(centerPoint: SimpleFeature, distanceGuess: Double): SomeGeoHashes = {
 
     // take the center point and extract some silly bounds.....
     val maxDistanceGuess = 10 * distanceGuess
@@ -31,7 +31,7 @@ class SomeGeoHashes(val aFeatureForSearch: SimpleFeature,
                     val theGHIterator: BoundingBoxGeoHashIterator,
                     val maxRadius: Double) extends mutable.PriorityQueue[GeoHash] {
   // define the ordering for the PriorityQueue
-  override val ord: Ordering[GeoHash] = Ordering.by { distanceCalc }
+  val ord: Ordering[GeoHash] = Ordering.by { distanceCalc }
 
   // helper method for distance. NOTE: this likely returns values in degrees
   def distanceCalc(gh: GeoHash) = aFeatureForSearch.point.distance(GeohashUtils.getGeohashGeom(gh))

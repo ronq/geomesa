@@ -21,7 +21,7 @@ object KNNQuery {
                      numDesired: Int,
                      searchRadius: Double,
                      aFeatureForSearch: SimpleFeature)
-  : NearestNeighbors = {
+  : NearestNeighbors[SimpleFeature] = {
     // setup the GH iterator -- it requires the search point and the searchRadius
     // use the horrible implementation first
     val geoHashPQ = SomeGeoHashes(aFeatureForSearch, searchRadius)
@@ -39,18 +39,18 @@ object KNNQuery {
                   ghPQ: SomeGeoHashes,
                   queryFeature: SimpleFeature,
                   status: KNNSearchStatus)
-  : NearestNeighbors = {
+  : NearestNeighbors[SimpleFeature] = {
     import geomesa.utils.geotools.Conversions.toRichSimpleFeatureIterator
     // filter the ghPQ if we've already found kNN
     if (status.foundK) ghPQ.mutateMaxRadius(status.currentMaxRadius)
     ghPQ.next match {
-      case None => new NearestNeighbors(queryFeature, status.numDesired)
+      case None => NearestNeighbors(queryFeature, status.numDesired)
       case Some(newGH) =>
         // copy the query in order to pass the original to the next recursion
         val newQuery = generateKNNQuery(newGH, query, source)
         val newFeatures = source.getFeatures(newQuery).features.toList
         status.updateNum(newFeatures.length) // increment number found
-        val newNeighbors = new NearestNeighbors(queryFeature, status.numDesired) ++= newFeatures
+        val newNeighbors = NearestNeighbors(queryFeature, status.numDesired) ++= newFeatures
         // apply filter to ghPQ if we've found k neighbors
         if (status.foundK) newNeighbors.maxDistance.foreach { status.updateDistance }
         newNeighbors ++= runKNNQuery(source, query, ghPQ, queryFeature, status)

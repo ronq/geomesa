@@ -1,0 +1,53 @@
+package geomesa.core.process.knn
+
+import com.vividsolutions.jts.geom.{Point, Geometry}
+import geomesa.utils.geotools.Conversions.RichSimpleFeature
+import org.opengis.feature.simple.SimpleFeature
+
+import scala.collection.mutable
+/**
+object DistanceHelpers4SF{
+  implicit class DistributedSimpleFeature(val sf: SimpleFeature) extends Ordered[SimpleFeature] {
+    val geom: Geometry = ???
+    def compare(that: SimpleFeature) =  this.distanceFrom(geom) - that.distanceFrom
+    def distanceFrom(geom: Geometry) =  geom.distance(sf.geometry)
+  }
+}
+**/
+object ImplicitSF {
+
+  implicit class ImplicitSF(sf: SimpleFeature) extends Ordering[SimpleFeature]
+
+     def distance(referenceFeature:SimpleFeature) = sf.point.distance(referenceFeature.geometry)
+     def compare(that:SimpleFeature) =
+
+}
+
+object EnrichedOrderedSF {
+  def apply(referencePoint: SimpleFeature, num:Int): EnrichedOrderedSF = {
+
+    // feed the center point and iterator to the class, and enqueue the first GH.
+    new EnrichedOrderedSF(referencePoint, num)
+  }
+}
+
+
+class EnrichedOrderedSF(val aFeatureForSearch: SimpleFeature, val numDesired: Int) extends mutable.PriorityQueue[SimpleFeature] {
+  val ord: Ordering[SimpleFeature] = Ordering.by { sf: SimpleFeature => distanceCalc(sf.geometry)}.reverse
+
+  def distanceCalc(geom: Geometry) = aFeatureForSearch.point.distance(geom)
+
+  def foundK: Boolean = !(this.length < numDesired)
+
+  def getLast: Option[SimpleFeature] = this.take(numDesired).lastOption
+
+  def maxDistance = getLast.map { sf => distanceCalc(sf.geometry)}
+
+  // this should include a guard against adding two NearestNeighbor collections which are for different points
+  // override def ++ (that: NearestNeighbors ) =  that.dequeueAll
+  // should override enqueue to prevent more than k elements from being contained
+}
+
+//lass GeodeticSimpleFeatures extends SimpleFeature with Comparable[SimpleFeature] {
+
+}

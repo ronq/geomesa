@@ -97,32 +97,21 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
   /** The KNN-Search interface for the WPS process.
     *
     * Takes as input a Query and SimpleFeatureSource, in addition to
-    *  inputFeatures which define one or more SimpleFeatures for which to find KNN of each
+    * inputFeatures which define one or more SimpleFeatures for which to find KNN of each
     *
-    *  Note that the results are NOT de-duplicated!
+    * Note that the results are NOT de-duplicated!
     *
     */
   def kNNSearch(source: SimpleFeatureSource, query: Query) = {
-    log.info("Running Geomesa K-Nearest Neighbor Search on source type "+source.getClass.getName)
-
-   // collection approach to creating a new feature collection, and filling it with the results of
-   // a KNN search for each feature in the inputFeatures
-   // comment out as this requires multiple lines
-   /**
+    log.info("Running Geomesa K-Nearest Neighbor Search on source type " + source.getClass.getName)
+    // create a new FeatureCollection, and add to it the results of a KNN query for each point in inputFeatures
     new DefaultFeatureCollection {
-       inputFeatures.features.map {
-         aFeatureForSearch =>addAll(
-           KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch ).dequeueAll.asJava )
-       } }
-    **/
-   // for-loop implementation
-   for {
-     resultsCollection:DefaultFeatureCollection <- new DefaultFeatureCollection()
-     aFeatureForSearch <- inputFeatures.features
-     theKNN = KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch ).dequeueAll.asJava
-     _      <- resultsCollection.addAll(theKNN)
-   } yield resultsCollection
+      inputFeatures.features.map {
+        aFeatureForSearch => addAll(
+          KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch).dequeueAll.asJava
+        )
+      }
+    }
   }
 }
-
 case class KNNResult(results: SimpleFeatureCollection) extends AbstractCalcResult
