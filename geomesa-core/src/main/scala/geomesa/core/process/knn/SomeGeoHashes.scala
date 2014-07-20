@@ -14,6 +14,19 @@ import scala.collection.mutable
  * For now, we use the BoundindBoxIterator as the GeoHash iterator.
  * Later, this will switch to the Touching GeoHash Iterator
  */
+trait NearestGeoHash {
+  def distance(gh:GeoHash):Double
+}
+
+trait GeoHashDistanceFilter extends NearestGeoHash {
+  var statefulFilterRadius: Double
+  // removes GeoHashes that are further than a certain distance from the aFeatureForSearch
+  def statefulDistanceFilter(gh: GeoHash): Boolean = { distance(gh) < statefulFilterRadius }
+
+  def mutateFilterRadius(radiusCandidate: Double): Unit = 
+  {statefulFilterRadius = math.min(radiusCandidate, statefulFilterRadius)}
+}
+
 object SomeGeoHashes {
   def apply(centerPoint: SimpleFeature, distanceGuess: Double) = {
 
@@ -22,8 +35,21 @@ object SomeGeoHashes {
     val (llGH, urGH) = GeoHashIterator.getBoundingGeoHashes(List(centerPoint.point), 30, maxDistanceGuess)
     val bBox = TwoGeoHashBoundingBox(llGH, urGH)
     val ghIt = new BoundingBoxGeoHashIterator(bBox)
+
+    // helper method for distance. NOTE: this likely returns values in degrees
+    def distanceCalc(gh: GeoHash) = centerPoint.point.distance(GeohashUtils.getGeohashGeom(gh))
+    def orderedGH: Ordering[GeoHash] = Ordering.by { gh: GeoHash => distanceCalc(gh)}
+
     // feed the center point and iterator to the class, and enqueue the first GH.
-    new SomeGeoHashes(centerPoint, ghIt, maxDistanceGuess) { enqueue(ghIt.next()) }
+    //new SomeGeoHashes(centerPoint, ghIt, maxDistanceGuess) { enqueue(ghIt.next()) }
+
+    new mutable.PriorityQueue[SimpleFeature]()(orderedGH) with GeoHashDistanceFilter{
+      override def distance(gh:GeoHash) = distanceCalc(gh)
+      statefulFilterRadius = maxDistanceGuess
+      enqueue(ghIt.next())
+    }
+
+
   }
 }
 
@@ -31,10 +57,10 @@ class SomeGeoHashes(val aFeatureForSearch: SimpleFeature,
                     val theGHIterator: BoundingBoxGeoHashIterator,
                     val maxRadius: Double) extends mutable.PriorityQueue[GeoHash] {
   // define the ordering for the PriorityQueue
-  override val ord: Ordering[GeoHash] = Ordering.by { distanceCalc }
+  // override val ord: Ordering[GeoHash] = Ordering.by { distanceCalc }
 
   // helper method for distance. NOTE: this likely returns values in degrees
-  def distanceCalc(gh: GeoHash) = aFeatureForSearch.point.distance(GeohashUtils.getGeohashGeom(gh))
+  //def distanceCalc(gh: GeoHash) = aFeatureForSearch.point.distance(GeohashUtils.getGeohashGeom(gh))
 
   // this must be a var since it has state
   var statefulMaxRadius = maxRadius
