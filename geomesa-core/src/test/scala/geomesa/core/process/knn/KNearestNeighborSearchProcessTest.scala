@@ -92,11 +92,11 @@ class KNearestNeighborSearchProcessTest extends Specification {
 
        dataFeatures.size should be equalTo 8
        val prox = new KNearestNeighborSearchProcess
-       prox.execute(inputFeatures, dataFeatures, 5, 50).size should be equalTo 0
-       prox.execute(inputFeatures, dataFeatures, 5, 90).size should be equalTo 0
-       prox.execute(inputFeatures, dataFeatures, 5, 99.1).size should be equalTo 6
-       prox.execute(inputFeatures, dataFeatures, 5, 100).size should be equalTo 6
-       prox.execute(inputFeatures, dataFeatures, 5, 101).size should be equalTo 6
+       prox.execute(inputFeatures, dataFeatures, 5, 50,  5000.0).size should be equalTo 0
+       prox.execute(inputFeatures, dataFeatures, 5, 90  ,5000.0).size should be equalTo 0
+       prox.execute(inputFeatures, dataFeatures, 5, 99.1,5000.0).size should be equalTo 6
+       prox.execute(inputFeatures, dataFeatures, 5, 100 ,5000.0).size should be equalTo 6
+       prox.execute(inputFeatures, dataFeatures, 5, 101, 5000.0).size should be equalTo 6
      }
    }
 
@@ -136,11 +136,11 @@ class KNearestNeighborSearchProcessTest extends Specification {
 
       nonAccumulo.size should be equalTo 8
       val prox = new KNearestNeighborSearchProcess
-      prox.execute(inputFeatures, nonAccumulo, 5, 30).size should be equalTo 0
-      prox.execute(inputFeatures, nonAccumulo, 5, 98).size should be equalTo 0
-      prox.execute(inputFeatures, nonAccumulo, 5, 99.0001).size should be equalTo 6
-      prox.execute(inputFeatures, nonAccumulo, 5, 100).size should be equalTo 6
-      prox.execute(inputFeatures, nonAccumulo, 5, 101).size should be equalTo 6
+      prox.execute(inputFeatures, nonAccumulo, 5, 30, 5000.0).size should be equalTo 0
+      prox.execute(inputFeatures, nonAccumulo, 5, 98,5000.0).size should be equalTo 0
+      prox.execute(inputFeatures, nonAccumulo, 5, 99.0001,5000.0).size should be equalTo 6
+      prox.execute(inputFeatures, nonAccumulo, 5, 100,5000.0).size should be equalTo 6
+      prox.execute(inputFeatures, nonAccumulo, 5, 101,5000.0).size should be equalTo 6
     }
   }
 

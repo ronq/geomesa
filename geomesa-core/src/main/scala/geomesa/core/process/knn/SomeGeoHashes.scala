@@ -36,24 +36,16 @@ object SomeGeoHashes {
     val bBox = TwoGeoHashBoundingBox(llGH, urGH)
     val ghIt = new BoundingBoxGeoHashIterator(bBox)
 
-    // helper method for distance. NOTE: this likely returns values in degrees
+    // These are helpers for distance calculations and ordering. NOTE: the below likely returns values in degrees
     def distanceCalc(gh: GeoHash) = centerPoint.point.distance(GeohashUtils.getGeohashGeom(gh))
     def orderedGH: Ordering[GeoHash] = Ordering.by { gh: GeoHash => distanceCalc(gh)}
 
-    // feed the center point and iterator to the class, and enqueue the first GH.
-    //new SomeGeoHashes(centerPoint, ghIt, maxDistanceGuess) { enqueue(ghIt.next()) }
-
-    val ghPQ = new mutable.PriorityQueue[GeoHash]()(orderedGH)
-      /**
-      with GeoHashDistanceFilter{
-      override def distance(gh:GeoHash) = distanceCalc(gh)
-      override var statefulFilterRadius = maxDistanceGuess
-      override val ord: Ordering[GeoHash] = Ordering.by { distanceCalc }
-      **/
-      new SomeGeoHashes2(ghPQ, ghIt, distanceCalc, maxDistanceGuess)
+    // Create a new GeoHash PriorityQueue and enqueue the first GH from the iterator as a seed.
+    val ghPQ = new mutable.PriorityQueue[GeoHash]()(orderedGH) { enqueue(ghIt.next()) }
+    new SomeGeoHashes(ghPQ, ghIt, distanceCalc, maxDistanceGuess)
     }
 }
-class SomeGeoHashes2(pq: mutable.PriorityQueue[GeoHash],
+class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
                      it: BoundingBoxGeoHashIterator,
                      distanceDef: GeoHash => Double,
                      maxRadius: Double  ) extends GeoHashDistanceFilter {
@@ -61,60 +53,15 @@ class SomeGeoHashes2(pq: mutable.PriorityQueue[GeoHash],
   override var statefulFilterRadius = maxRadius
   statefulFilterRadius = maxRadius
 
-  var onDeck: Option[GeoHash] = None
-  var nextPQ: Option[GeoHash] = None
-  var nextIt: Option[GeoHash] = None
-
-  private def loadNextPQ() {
-    nextPQ = pq.find { statefulDistanceFilter }
-  }
-
-  private def loadNextIt() {
-    nextIt =  it.find { statefulDistanceFilter }.map{pq.enqueue}
-  }
-
-  private def loadNext() {
-    def next: Option[GeoHash] =
-      for {
-        newGH  <- pq.find { statefulDistanceFilter }          // get the next element in the queue that passes the filter
-        nextGH <- it.find { statefulDistanceFilter } // if that was successful, get the same in the iterator
-        _ = pq.enqueue(nextGH)                          // if that was successful, add it to the queue
-      } yield newGH
-    /**
-    (nextPQ, nextIt) match {
-      case (None, _) => onDeck = None  // nothing left in the priorityQueue
-      //case (_, None) => onDeck = None  // nothing left in the Iterator
-      //case (Some(x), Some(y)) if x < y => loadNextX(); loadNext()
-      //case (Some(x), Some(y)) if x > y => loadNextY(); loadNext()
-      case (Some(x), Some(t)) =>  loadNextPQ(); loadNextIt(); onDeck = Some(x)
-    }
-    **/
-  }
-
-  def hasNext() = onDeck.isDefined
-  def next() = {loadNext()
-               onDeck.getOrElse(throw new Exception)  }
-  loadNextPQ()
-  loadNextIt()
-  loadNext()
-}
-/**
-class SomeGeoHashes(val aFeatureForSearch: SimpleFeature,
-                    val theGHIterator: BoundingBoxGeoHashIterator,
-                    val maxRadius: Double) extends mutable.PriorityQueue[GeoHash] {
-
-
-  /** returns the next element in the queue, and enqueues the next entry in the iterator
-   *  this will return None if no elements in the queue pass the filter
-   **/
+  // Note that next returns an Option. There is then no need to define hasNext
   def next: Option[GeoHash] =
     for {
-      newGH  <- this.find { statefulDistanceFilter }          // get the next element in the queue that passes the filter
-      nextGH <- theGHIterator.find { statefulDistanceFilter } // if that was successful, get the same in the iterator
-           _ = this.enqueue(nextGH)                          // if that was successful, add it to the queue
+      newGH  <- pq.find { statefulDistanceFilter }          // get the next element in the queue that passes the filter
+      nextGH <- it.find { statefulDistanceFilter }          // if that was successful, get the same in the iterator
+      _ = pq.enqueue(nextGH)                                // if that was successful, add it to the queue
     } yield newGH
 }
-**/
+
 object EnrichmentPatch {
 
   implicit class EnrichedBBGHI(bbghi: BoundingBoxGeoHashIterator) {
