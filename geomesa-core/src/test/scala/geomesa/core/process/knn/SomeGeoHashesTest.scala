@@ -27,42 +27,7 @@ class SomeGeoHashesTest extends Specification {
 
   sequential
 
-  def diagonalFeatureCollection: DefaultFeatureCollection = {
-    val sftName = "geomesaKNNTestDiagonalFeature"
-    val sft = DataUtilities.createType(sftName, index.spec)
-    sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = DEFAULT_DTG_PROPERTY_NAME
 
-    val featureCollection = new DefaultFeatureCollection(sftName, sft)
-    val constantDate = new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate
-    // generate a range of Simple Features along a "diagonal"
-    Range(0, 91).foreach { lat =>
-      val sf = SimpleFeatureBuilder.build(sft, List(), lat.toString)
-      sf.setDefaultGeometry(WKTUtils.read(f"POINT($lat%d $lat%d)"))
-      sf.setAttribute(DEFAULT_DTG_PROPERTY_NAME, constantDate)
-      sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
-      featureCollection.add(sf)
-    }
-    featureCollection
-  }
-
-  def polarFeatureCollection: DefaultFeatureCollection = {
-    val sftName = "geomesaKNNTestPolarFeature"
-    val sft = DataUtilities.createType(sftName, index.spec)
-    sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = DEFAULT_DTG_PROPERTY_NAME
-
-    val featureCollection = new DefaultFeatureCollection(sftName, sft)
-    val constantDate = new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate
-    val polarLat = 89.9
-    // generate a range of Simple Features along a "diagonal"
-    Range(-180, 180).foreach { lon =>
-      val sf = SimpleFeatureBuilder.build(sft, List(), lon.toString)
-      sf.setDefaultGeometry(WKTUtils.read(f"POINT($lon%d $polarLat)"))
-      sf.setAttribute(DEFAULT_DTG_PROPERTY_NAME, constantDate)
-      sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
-      featureCollection.add(sf)
-    }
-    featureCollection
-  }
 
   val sftName = "geomesaKNNTestQueryFeature"
   val sft = DataUtilities.createType(sftName, index.spec)

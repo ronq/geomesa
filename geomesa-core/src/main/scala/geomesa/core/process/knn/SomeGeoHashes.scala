@@ -37,6 +37,7 @@ object SomeGeoHashes {
 
     // These are helpers for distance calculations and ordering.
     // FIXME: using JTS distance returns the cartesian distance only, and does NOT handle wraps correctly
+    // also, the units are degrees, while meters are used elsewhere. So this won't even work
     def distanceCalc(gh: GeoHash) = centerPoint.point.distance(GeohashUtils.getGeohashGeom(gh))
     def orderedGH: Ordering[GeoHash] = Ordering.by { gh: GeoHash => distanceCalc(gh)}
 
@@ -52,8 +53,9 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
                      maxDistance: Double  ) extends GeoHashDistanceFilter {
   override def distance = distanceDef
   override var statefulFilterRadius = maxDistance
-  //statefulFilterRadius = maxDistance
-
+  def updateDistance(theNewMaxDistance: Double) {
+    if (theNewMaxDistance < statefulFilterRadius) statefulFilterRadius = theNewMaxDistance
+  }
   // Note that next returns an Option. There is then no need to define hasNext
   def next: Option[GeoHash] =
     for {
