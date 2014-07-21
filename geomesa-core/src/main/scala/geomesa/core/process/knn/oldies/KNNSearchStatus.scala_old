@@ -2,6 +2,10 @@ package geomesa.core.process.knn
 
 import geomesa.utils.geohash.GeoHash
 
+/**
+ * Not used anymore
+ */
+
 case class KNNSearchStatus(numDesired: Int, startingDistance: Double) {
   private var smallestMaxDistance: Double = startingDistance
   private var numFound: Int = 0
