@@ -28,11 +28,10 @@ trait GeoHashDistanceFilter extends NearestGeoHash {
 }
 
 object SomeGeoHashes {
-  def apply(centerPoint: SimpleFeature, distanceGuess: Double) = {
+  def apply(centerPoint: SimpleFeature, distanceGuess: Double, maxDistance: Double) = {
 
-    // take the center point and extract some silly bounds.....
-    val maxDistanceGuess = 10 * distanceGuess
-    val (llGH, urGH) = GeoHashIterator.getBoundingGeoHashes(List(centerPoint.point), 30, maxDistanceGuess)
+    // take the center point and use the supplied bounds..
+    val (llGH, urGH) = GeoHashIterator.getBoundingGeoHashes(List(centerPoint.point), 30, maxDistance)
     val bBox = TwoGeoHashBoundingBox(llGH, urGH)
     val ghIt = new BoundingBoxGeoHashIterator(bBox)
 
@@ -43,17 +42,17 @@ object SomeGeoHashes {
 
     // Create a new GeoHash PriorityQueue and enqueue the first GH from the iterator as a seed.
     val ghPQ = new mutable.PriorityQueue[GeoHash]()(orderedGH) { enqueue(ghIt.next()) }
-    new SomeGeoHashes(ghPQ, ghIt, distanceCalc, maxDistanceGuess)
+    new SomeGeoHashes(ghPQ, ghIt, distanceCalc, maxDistance)
     }
 }
 
 class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
                      it: BoundingBoxGeoHashIterator,
                      distanceDef: GeoHash => Double,
-                     maxRadius: Double  ) extends GeoHashDistanceFilter {
+                     maxDistance: Double  ) extends GeoHashDistanceFilter {
   override def distance = distanceDef
-  override var statefulFilterRadius = maxRadius
-  statefulFilterRadius = maxRadius
+  override var statefulFilterRadius = maxDistance
+  //statefulFilterRadius = maxDistance
 
   // Note that next returns an Option. There is then no need to define hasNext
   def next: Option[GeoHash] =

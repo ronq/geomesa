@@ -76,7 +76,7 @@ class SomeGeoHashesTest extends Specification {
       import geomesa.utils.geotools.Conversions._
       val ccriGH =  GeoHash(ccriSF.point,30)
       println (ccriGH.hash)
-      val ccriPQ = SomeGeoHashes(ccriSF, 1000.0)
+      val ccriPQ = SomeGeoHashes(ccriSF, 1000.0, 10000.0)
       println(ccriPQ.next)
       println(ccriPQ.next)
       val ccriPQ2List = ccriPQ.toList

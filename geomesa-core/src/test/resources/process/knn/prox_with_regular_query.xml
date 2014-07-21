@@ -99,7 +99,7 @@
         </wps:Input>
 
         <wps:Input>
-            <ows:Identifier>bufferDistance</ows:Identifier>
+            <ows:Identifier>estimatedDistance</ows:Identifier>
             <wps:Data>
                 <wps:LiteralData>100</wps:LiteralData>
             </wps:Data>

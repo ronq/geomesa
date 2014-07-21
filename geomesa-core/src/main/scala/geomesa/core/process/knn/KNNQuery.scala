@@ -19,14 +19,15 @@ object KNNQuery {
   def runNewKNNQuery(source: SimpleFeatureSource,
                      query: Query,
                      numDesired: Int,
-                     searchRadius: Double,
+                     searchDistance: Double,
+                     maxDistance: Double,
                      aFeatureForSearch: SimpleFeature)
   : NearestNeighbors[SimpleFeature] = {
     // setup the GH iterator -- it requires the search point and the searchRadius
     // use the horrible implementation first
-    val geoHashPQ = SomeGeoHashes(aFeatureForSearch, searchRadius)
+    val geoHashPQ = SomeGeoHashes(aFeatureForSearch, searchDistance, maxDistance)
     // setup the stateful object for record keeping
-    val searchStatus = KNNSearchStatus(numDesired, geoHashPQ.statefulFilterRadius)
+    val searchStatus = KNNSearchStatus(numDesired, maxDistance)
     // begin the search with the recursive method
     runKNNQuery(source, query, geoHashPQ, aFeatureForSearch, searchStatus)
   }

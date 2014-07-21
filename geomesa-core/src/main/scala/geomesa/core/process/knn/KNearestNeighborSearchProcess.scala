@@ -42,14 +42,14 @@ class KNearestNeighborSearchProcess {
                numDesired: java.lang.Integer,
 
                @DescribeParameter(
-                 name = "bufferDistance",
-                 description = "Buffer size in meters")
-               bufferDistance: java.lang.Double,
+                 name = "estimatedDistance",
+                 description = "Estimate of Search Distance in meters for K neighbors---used to set the granularity of the search")
+               estimatedDistance: java.lang.Double,
 
                @DescribeParameter(
-                 name = "maxSearchRadius",
-                 description = "Maximum search radius in meters---used to prevent runaway queries of the entire table")
-               maxSearchRadius: java.lang.Double
+                 name = "maxSearchDistance",
+                 description = "Maximum search distance in meters---used to prevent runaway queries of the entire table")
+               maxSearchDistance: java.lang.Double
                ): SimpleFeatureCollection = {
 
     log.info("Attempting Geomesa K-Nearest Neighbor Search on collection type " + dataFeatures.getClass.getName)
@@ -60,7 +60,7 @@ class KNearestNeighborSearchProcess {
     if(dataFeatures.isInstanceOf[ReTypingFeatureCollection]) {
       log.warn("WARNING: layer name in geoserver must match feature type name in geomesa")
     }
-    val visitor = new KNNVisitor(inputFeatures, dataFeatures, numDesired, bufferDistance)
+    val visitor = new KNNVisitor(inputFeatures, dataFeatures, numDesired, estimatedDistance, maxSearchDistance)
     dataFeatures.accepts(visitor, new NullProgressListener)
     visitor.getResult.asInstanceOf[KNNResult].results
   }
@@ -73,7 +73,8 @@ class KNearestNeighborSearchProcess {
 class KNNVisitor( inputFeatures: SimpleFeatureCollection,
                                dataFeatures: SimpleFeatureCollection,
                                numDesired: java.lang.Integer,
-                               bufferDistance: java.lang.Double
+                               estimatedDistance: java.lang.Double,
+                               maxSearchDistance: java.lang.Double
                              ) extends FeatureCalc {
 
   private val log = Logger.getLogger(classOf[KNNVisitor])
@@ -108,7 +109,7 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
     new DefaultFeatureCollection {
       inputFeatures.features.map {
         aFeatureForSearch => addAll(
-          KNNQuery.runNewKNNQuery(source, query, numDesired, bufferDistance, aFeatureForSearch).dequeueAll.asJava
+          KNNQuery.runNewKNNQuery(source, query, numDesired, estimatedDistance, maxSearchDistance, aFeatureForSearch).dequeueAll.asJava
         )
       }
     }
