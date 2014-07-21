@@ -36,7 +36,8 @@ object SomeGeoHashes {
     val bBox = TwoGeoHashBoundingBox(llGH, urGH)
     val ghIt = new BoundingBoxGeoHashIterator(bBox)
 
-    // These are helpers for distance calculations and ordering. NOTE: the below likely returns values in degrees
+    // These are helpers for distance calculations and ordering.
+    // FIXME: using JTS distance returns the cartesian distance only, and does NOT handle wraps correctly
     def distanceCalc(gh: GeoHash) = centerPoint.point.distance(GeohashUtils.getGeohashGeom(gh))
     def orderedGH: Ordering[GeoHash] = Ordering.by { gh: GeoHash => distanceCalc(gh)}
 
@@ -45,6 +46,7 @@ object SomeGeoHashes {
     new SomeGeoHashes(ghPQ, ghIt, distanceCalc, maxDistanceGuess)
     }
 }
+
 class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
                      it: BoundingBoxGeoHashIterator,
                      distanceDef: GeoHash => Double,
@@ -57,9 +59,17 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
   def next: Option[GeoHash] =
     for {
       newGH  <- pq.find { statefulDistanceFilter }          // get the next element in the queue that passes the filter
+      _      = println("test gh:"+ newGH.hash)
       nextGH <- it.find { statefulDistanceFilter }          // if that was successful, get the same in the iterator
       _ = pq.enqueue(nextGH)                                // if that was successful, add it to the queue
     } yield newGH
+  def toList: List[GeoHash] = {getNext(List[GeoHash]()) }
+  def getNext(ghList: List[GeoHash]): List[GeoHash] = {
+      next match {
+        case None => ghList
+        case Some(element) => getNext(element::ghList)
+      }
+    }
 }
 
 object EnrichmentPatch {
