@@ -6,6 +6,7 @@ import geomesa.utils.geohash._
 import geomesa.utils.geotools.Conversions.RichSimpleFeature
 import org.opengis.feature.simple.SimpleFeature
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 /**
@@ -59,7 +60,7 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
   // Note that next returns an Option. There is then no need to define hasNext
   def next: Option[GeoHash] =
     for {
-      newGH  <- pq.find { statefulDistanceFilter }          // get the next element in the queue that passes the filter
+      newGH  <- pq.dequeuingFind { statefulDistanceFilter }          // get the next element in the queue that passes the filter
       _      = println("test gh:"+ newGH.hash)
       nextGH <- it.find { statefulDistanceFilter }          // if that was successful, get the same in the iterator
       _ = pq.enqueue(nextGH)                                // if that was successful, add it to the queue
@@ -71,12 +72,33 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
         case Some(element) => getNext(element::ghList)
       }
     }
+  def dequeuingFind(pred: GeoHash => Boolean) = {
+    // remove all leading elements that do NOT match the predicate
+    // could just do pq = pq.dropWhile(!pred)
+    //                    Some(pq.dequeue)
+
+
+  }
+
 }
 
 object EnrichmentPatch {
+  // It might be nice to make this more general and dispense with the GeoHash type.
+  implicit class EnrichedPQ(pq: mutable.PriorityQueue[GeoHash]) {
+    @tailrec
+    final def dequeuingFind(func: GeoHash => Boolean): Option[GeoHash] = {
+      if (pq.isEmpty) None
+      else {
+        val theHead = pq.dequeue()
+        if (func(theHead)) Option(theHead)
+        else dequeuingFind(func)
+      }
+    }
+  }
 
   implicit class EnrichedBBGHI(bbghi: BoundingBoxGeoHashIterator) {
-    def find(func: GeoHash => Boolean): Option[GeoHash] = {
+    @tailrec
+    final def find(func: GeoHash => Boolean): Option[GeoHash] = {
       if (!bbghi.hasNext) None
       else {
         if (func(bbghi.queue.head)) Option(bbghi.next())
