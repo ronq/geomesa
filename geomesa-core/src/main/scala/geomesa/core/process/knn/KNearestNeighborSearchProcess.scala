@@ -106,12 +106,27 @@ class KNNVisitor( inputFeatures: SimpleFeatureCollection,
   def kNNSearch(source: SimpleFeatureSource, query: Query) = {
     log.info("Running Geomesa K-Nearest Neighbor Search on source type " + source.getClass.getName)
     // create a new FeatureCollection, and add to it the results of a KNN query for each point in inputFeatures
+    // the SimpleFeatures are extracted from the (SimpleFeature,distance) tuple here
+
+    // approach #1
+    /**
     new DefaultFeatureCollection {
       inputFeatures.features.map {
         aFeatureForSearch => addAll(
-          KNNQuery.runNewKNNQuery(source, query, numDesired, estimatedDistance, maxSearchDistance, aFeatureForSearch).dequeueAll.asJava
+          KNNQuery.runNewKNNQuery(source, query, numDesired, estimatedDistance, maxSearchDistance, aFeatureForSearch).map{_._1 }.asJavaCollection
+
         )
       }
+    }
+    **/
+    //approach #2 using a for loop. More readable but the yield is ugly.......
+    new DefaultFeatureCollection {
+      for {
+        aFeatureForSearch <- inputFeatures.features
+        knnResults = KNNQuery.runNewKNNQuery(source, query, numDesired, estimatedDistance, maxSearchDistance, aFeatureForSearch)
+        list = knnResults.map{_._1}.asJavaCollection  // the map extracts the SimpleFeature from the tuple
+        _ = addAll(list)
+      } yield Unit
     }
   }
 }

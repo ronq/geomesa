@@ -6,7 +6,7 @@ import org.geotools.data.Query
 import org.geotools.data.simple.SimpleFeatureSource
 import org.geotools.geometry.jts.ReferencedEnvelope
 import org.opengis.feature.simple.SimpleFeature
-
+import scala.collection.mutable
 import scala.annotation.tailrec
 
 /**
@@ -24,7 +24,7 @@ object KNNQuery {
                      searchDistance: Double,
                      maxDistance: Double,
                      aFeatureForSearch: SimpleFeature)
-  : NearestNeighbors[SimpleFeature] = {
+  : mutable.PriorityQueue[(SimpleFeature,Double)] = {
     // setup the GH iterator -- it requires the search point and the searchRadius
     // use the horrible implementation first
     val geoHashPQ = SomeGeoHashes(aFeatureForSearch, searchDistance, maxDistance)
@@ -44,8 +44,8 @@ object KNNQuery {
   def runKNNQuery(source: SimpleFeatureSource,
                    query: Query,
                    ghPQ: SomeGeoHashes,
-                   sfPQ: NearestNeighbors[SimpleFeature])
-  : NearestNeighbors[SimpleFeature]   = {
+                   sfPQ: NearestNeighbors[(SimpleFeature,Double)])
+  : NearestNeighbors[(SimpleFeature,Double)]   = {
     import geomesa.utils.geotools.Conversions.toRichSimpleFeatureIterator
     // add a filter to the ghPQ if we've already found kNN
     //val newghPQ = if (numDesired <= numFound) ghPQ.withFilter(thing(kNN.maxDistance)) else ghPQ
@@ -54,9 +54,9 @@ object KNNQuery {
       case Some(newGH) =>
         // copy the query in order to pass the original to the next recursion
         val newQuery = generateKNNQuery(newGH, query, source)
-        val newFeatures = source.getFeatures(newQuery).features.toList
-        //val numFoundNow = numFound + newFeatures.length // increment number found
-        sfPQ ++= newFeatures
+        val newFeatures = source.getFeatures(newQuery).features
+        // insert the SimpleFeature and its distance into sfPQ
+        newFeatures.map{ sf:SimpleFeature => sfPQ.enqueue( (sf,sfPQ.distance(sf)) ) }
         // apply filter to ghPQ if we've found k neighbors
         if (sfPQ.isFull) sfPQ.maxDistance.foreach { x: Double => ghPQ.updateDistance(x)}
         runKNNQuery(source, query, ghPQ, sfPQ)

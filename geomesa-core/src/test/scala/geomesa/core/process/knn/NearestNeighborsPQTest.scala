@@ -1,21 +1,14 @@
 package geomesa.core.process.knn
 
-//import geomesa.core.index
-
-import com.vividsolutions.jts.operation.distance.DistanceOp
 
 import collection.JavaConversions._
-import com.vividsolutions.jts.geom.Coordinate
-//import geomesa.core.data.{AccumuloFeatureStore, AccumuloDataStore}
 import geomesa.core._
 import geomesa.core.index.Constants
-//import geomesa.utils.geotools.GeometryUtils
 import geomesa.utils.text.WKTUtils
 import org.geotools.data.DataUtilities
 import org.geotools.factory.Hints
 import org.geotools.feature.DefaultFeatureCollection
 import org.geotools.feature.simple.SimpleFeatureBuilder
-import org.geotools.geometry.jts.JTSFactoryFinder
 import org.joda.time.{DateTimeZone, DateTime}
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
@@ -93,38 +86,38 @@ class NearestNeighborsPQTest extends Specification {
     "find things close by the equator" in {
       import geomesa.utils.geotools.Conversions._
       val equatorPQ = NearestNeighbors(equatorSF, 10)
-      equatorPQ ++= diagonalFeatureCollection.features.toList
+      equatorPQ ++= diagonalFeatureCollection.features.map{sf=> (sf,equatorPQ.distance(sf))}
 
-      equatorPQ.dequeue().getID must equalTo("0")
+      equatorPQ.head._1.getID must equalTo("0")
     }
 
     "find things close by Southwest Russia" in {
       import geomesa.utils.geotools.Conversions._
       val midpointPQ = NearestNeighbors(midpointSF, 10)
-      midpointPQ ++= diagonalFeatureCollection.features.toList
+      midpointPQ ++= diagonalFeatureCollection.features.map{sf=> (sf,midpointPQ.distance(sf))}
 
-      midpointPQ.dequeue().getID must equalTo("45")
+      midpointPQ.head._1.getID must equalTo("45")
     }
 
     "find things close by the North Pole" in {
       import geomesa.utils.geotools.Conversions._
       val polarPQ = NearestNeighbors(polarSF, 10)
-      polarPQ ++= diagonalFeatureCollection.features.toList
-      polarPQ.dequeue().getID must equalTo("90")
+      polarPQ ++= diagonalFeatureCollection.features.map{sf=> (sf,polarPQ.distance(sf))}
+      polarPQ.head._1.getID must equalTo("90")
     }
 
     "find things in the north polar region" in {
       import geomesa.utils.geotools.Conversions._
       val polarPQ = NearestNeighbors(polarSF, 10)
-      polarPQ ++= polarFeatureCollection.features.toList
-      polarPQ.dequeue().getID must equalTo("90")
+      polarPQ ++= polarFeatureCollection.features.map{sf=> (sf,polarPQ.distance(sf))}
+      polarPQ.head._1.getID must equalTo("90")
     }
 
     "find more things near the north polar region" in {
       import geomesa.utils.geotools.Conversions._
       val polarPQ = NearestNeighbors(polarSF2, 10)
-      polarPQ ++= polarFeatureCollection.features.toList
-      polarPQ.dequeue().getID must equalTo("0")
+      polarPQ ++= polarFeatureCollection.features.map{sf=> (sf,polarPQ.distance(sf))}
+      polarPQ.head._1.getID must equalTo("0")
     }
   }
 }
