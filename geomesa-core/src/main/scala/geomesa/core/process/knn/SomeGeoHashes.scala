@@ -61,25 +61,17 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
   def next: Option[GeoHash] =
     for {
       newGH  <- pq.dequeuingFind { statefulDistanceFilter }          // get the next element in the queue that passes the filter
-      _      = println("test gh:"+ newGH.hash)
       nextGH <- it.find { statefulDistanceFilter }          // if that was successful, get the same in the iterator
       _ = pq.enqueue(nextGH)                                // if that was successful, add it to the queue
     } yield newGH
   def toList: List[GeoHash] = {getNext(List[GeoHash]()) }
-  def getNext(ghList: List[GeoHash]): List[GeoHash] = {
+  @tailrec
+  private def getNext(ghList: List[GeoHash]): List[GeoHash] = {
       next match {
         case None => ghList
         case Some(element) => getNext(element::ghList)
       }
     }
-  def dequeuingFind(pred: GeoHash => Boolean) = {
-    // remove all leading elements that do NOT match the predicate
-    // could just do pq = pq.dropWhile(!pred)
-    //                    Some(pq.dequeue)
-
-
-  }
-
 }
 
 object EnrichmentPatch {

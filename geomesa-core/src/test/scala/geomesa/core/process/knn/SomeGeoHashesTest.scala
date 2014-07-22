@@ -4,6 +4,7 @@ package geomesa.core.process.knn
 
 import com.vividsolutions.jts.operation.distance.DistanceOp
 import geomesa.utils.geohash.GeoHash
+import geomesa.utils.geohash.GeohashUtils
 
 import collection.JavaConversions._
 import com.vividsolutions.jts.geom.Coordinate
@@ -33,7 +34,7 @@ class SomeGeoHashesTest extends Specification {
   val sft = DataUtilities.createType(sftName, index.spec)
 
   val ccriSF = SimpleFeatureBuilder.build(sft, List(), "equator")
-  ccriSF.setDefaultGeometry(WKTUtils.read(f"POINT(-78.4953560 38.0752150)"))
+  ccriSF.setDefaultGeometry(WKTUtils.read(f"POINT(-78.4953560 38.0752150 )"))
   ccriSF.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
 
   "Geomesa SomeGeoHashes PriorityQueue" should {
@@ -41,25 +42,25 @@ class SomeGeoHashesTest extends Specification {
       import geomesa.utils.geotools.Conversions._
       val ccriGH =  GeoHash(ccriSF.point,30)
       println (ccriGH.hash)
-      val ccriPQ = SomeGeoHashes(ccriSF, 1000.0, 10000.0)
-      println(ccriPQ.next)
-      println(ccriPQ.next)
+      println (GeohashUtils.getGeohashMaxDimensionMeters(ccriGH))
+      val ccriPQ = SomeGeoHashes(ccriSF, 1000.0, 1000.0)
       val ccriPQ2List = ccriPQ.toList
       //val distances = equatorPQ {newGH => (newGH.hashCode, equatorPQ.distance(newGH) ) }
       //val results = ccriPQ2List
       //println(results)
+      val nearest9 = ccriPQ2List.take(9)
 
-      println(ccriPQ.next)
+
 
       val results = for {
         newGH <- ccriPQ2List
         hashCode = newGH.hash
         dist     = ccriPQ.distance(newGH)
       } yield (hashCode,dist)
+      println(results.take(9) )
 
 
-
-      //println(results)
+      println(results.length)
       ccriPQ2List.nonEmpty must beTrue
       //equatorPQ ++= diagonalFeatureCollection.features.toList
 
