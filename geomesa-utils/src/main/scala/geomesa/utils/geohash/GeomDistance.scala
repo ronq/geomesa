@@ -16,7 +16,7 @@
 
 package geomesa.utils.geohash
 
-import com.vividsolutions.jts.geom._
+import com.vividsolutions.jts.geom.{Coordinate, GeometryFactory, PrecisionModel, Point}
 import geomesa.utils.text.ObjectPoolFactory
 import java.awt.geom.Point2D
 import org.geotools.referencing.GeodeticCalculator
@@ -83,15 +83,6 @@ trait GeomDistance {
 object VincentyModel extends GeomDistance {
   private val geometryFactory = new GeometryFactory(new PrecisionModel, 4326)
   private val geodeticCalculatorPool = ObjectPoolFactory { new GeodeticCalculator }
-
-  /**
-   *
-   */
-  def getMinDistanceBetweenPointAndGeometry(a: Point, g: Geometry) = {
-    g.getCoordinates
-
-  }
-
 
   /**
    * Computation of the distance between two points.

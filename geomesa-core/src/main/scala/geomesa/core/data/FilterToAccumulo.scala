@@ -20,7 +20,7 @@ import com.vividsolutions.jts.geom._
 import geomesa.core.data.FilterToAccumulo._
 import geomesa.core.index
 import geomesa.utils.filters.Filters._
-import geomesa.utils.geohash.WrappingUtils.getInternationalDateLineSafeGeometry
+import geomesa.utils.geohash.GeohashUtils.getInternationalDateLineSafeGeometry
 import geomesa.utils.geometry.Geometry._
 import geomesa.utils.geotools.Conversions._
 import geomesa.utils.geotools.GeometryUtils
