@@ -57,21 +57,32 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
   def updateDistance(theNewMaxDistance: Double) {
     if (theNewMaxDistance < statefulFilterRadius) statefulFilterRadius = theNewMaxDistance
   }
-  // Note that next returns an Option. There is then no need to define hasNext
-  def next: Option[GeoHash] =
+
+  // Note that next returns an Option. There is then no need to define hasNext.
+  def next(): Option[GeoHash] =
     for {
-      newGH  <- pq.dequeuingFind { statefulDistanceFilter }          // get the next element in the queue that passes the filter
-      nextGH <- it.find { statefulDistanceFilter }          // if that was successful, get the same in the iterator
-      _ = pq.enqueue(nextGH)                                // if that was successful, add it to the queue
+      newGH <- pq.dequeuingFind { statefulDistanceFilter } // get the next element in the queue that passes the filter
+      _      = it.find { statefulDistanceFilter } foreach {gh:GeoHash => pq.enqueue(gh)} // insert the same from the iterator
     } yield newGH
-  def toList: List[GeoHash] = {getNext(List[GeoHash]()) }
+
+  def toList(): List[GeoHash] = {getNext(List[GeoHash]()) }
   @tailrec
   private def getNext(ghList: List[GeoHash]): List[GeoHash] = {
-      next match {
+      next() match {
         case None => ghList
         case Some(element) => getNext(element::ghList)
       }
     }
+  // this method is used to load the PriorityQueue with contents from the iterator
+  // this is needed in this case since the iterator only returns results one at a time and hence
+  // next() will not return results in order
+  @tailrec
+  final def exhaustIterator(): Unit = {
+    it.find { statefulDistanceFilter } match {
+      case None => Unit
+      case Some(element) => pq.enqueue(element); exhaustIterator()
+    }
+  }
 }
 
 object EnrichmentPatch {
@@ -93,7 +104,8 @@ object EnrichmentPatch {
     final def find(func: GeoHash => Boolean): Option[GeoHash] = {
       if (!bbghi.hasNext) None
       else {
-        if (func(bbghi.queue.head)) Option(bbghi.next())
+        val theHead = bbghi.next()
+        if (func(theHead)) Option(theHead)
         else bbghi.find(func)
       }
     }
