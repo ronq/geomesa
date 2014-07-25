@@ -19,6 +19,7 @@ class SomeGeoHashesTest extends Specification {
     val sftName = "geomesaKNNTestQueryFeature"
     val sft = DataUtilities.createType(sftName, index.spec)
 
+
     val cvilleSF = SimpleFeatureBuilder.build(sft, List(), "equator")
     cvilleSF.setDefaultGeometry(WKTUtils.read(f"POINT(-78.4953560 38.0752150 )"))
     cvilleSF.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
