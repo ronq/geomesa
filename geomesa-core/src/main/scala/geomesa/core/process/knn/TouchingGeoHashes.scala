@@ -1,55 +1,68 @@
 package geomesa.core.process.knn
 
-import com.vividsolutions.jts.geom.Point
+import com.vividsolutions.jts.geom.Coordinate
 import geomesa.utils.geohash.GeoHash
-import breeze.linalg._
 
-// FIXME: type alias for DenseVector[Double] and List[DenseVector[Double]]
 
+import scala.collection.immutable.NumericRange
+
+/**
+ * This object provides a method for obtaining a set of GeoHashes which are in "contact" with a seed GeoHash.
+ * Sets are used throughout to avoid duplication.
+ *
+ * These methods exploit the symmetry of GeoHashes to ensure that they are both antimeridian (aka Internaional Data Line)
+ * and "pole" safe. For the latter, any GeoHash that touches the pole has all such GeoHashes as "touching" neighbors
+ */
 
 object TouchingGeoHashes {
+  // generates directions for stepping N,NE,E, etc...
   val shiftPattern = for {
-      i <- List(-1, 0, 1)
-      j <- List(-1, 0, 1)
-    } yield DenseVector[Double](i, j)
-  def touching(gh:GeoHash): Seq[GeoHash] = {
-    val thisLoc = gh.getPoint
-    val thisLocVector = DenseVector[Double](thisLoc.getX,thisLoc.getY)
+      i <- Set(-1, 0, 1)
+      j <- Set(-1, 0, 1)
+    } yield new Coordinate(i, j)
+  // generates a set of all touching neighbors
+  def touching(gh:GeoHash): Set[GeoHash] = {
+
+    val thisLocVector = gh.getPoint.getCoordinate
+
     val thisPrec = gh.prec
-    val thisLatPrec = GeoHash.latitudeDeltaForPrecision(thisPrec)
-    val thisLonPrec = GeoHash.longitudeDeltaForPrecision(thisPrec)
-    val thisPrecVector = DenseVector[Double](thisLonPrec,thisLatPrec)
-    val newCoords = shiftPattern.map {jumpUnitVector => thisLocVector + (jumpUnitVector:* thisPrecVector :* 2.0)}
 
+    val thisPrecVector = new Coordinate (GeoHash.longitudeDeltaForPrecision(thisPrec),
+      GeoHash.latitudeDeltaForPrecision(thisPrec))
 
-    for {
-      xyPair <- newCoords
-      safePair <- generateSafeCoordinates(xyPair)
-      // extract coordinates from safe pair back to Points
-      newGH <- GeoHash(safePair)
-    } yield {newGh}.toSeq
-  }
-  def generateIDLSafeCoordinates(xyPair: DenseVector[Double]): List[DenseVector[Double]] = { }
-             if (math.abs(xyPair(0)) > 180.0) generateIDLMirrorPair() else List(xyPair)
-  def generatePolarSafeCoordinates(xyPair: DenseVector[Double] ,
-                                   precVector:DenseVector[Double] ,
-                                   startingPair:DenseVector[Double] ): List[DenseVector[Double]] = {
-             if (math.abs(xyPair(1)) > 90.0) polarCap() else List(xyPair)
-  }
-  def generateIDLMirrorPair(xyPair:DenseVector[Double]): List[DenseVector[Double]] = {
-      val newLat= xyPair(1)
-      val newLon= xyPair(0) + degreesLonTranslation(xyPair(0))
-      List(DenseVector[Double] (newLon,newLat))
-  }
-  def generatePolarSafeCoordinates(xyPair, :DenseVector[Double],
-                                   precVector:DenseVector[Double] ,
-                                   startingPair:DenseVector[Double] )   = {
-      val newLat = startingPair(1)  // should be the original
-      val newLons = NumericRange(-180 + precVector(0), 180.- precVector(0), 2.* precVector(0)) // should be the centers of all GHs in lat
-      //val allLongtitudes = NumericRange(-180 + lonDelta, 180.- lonDelta, 2.* lonDelta)
-  }
-}
+    val newCoords = for {
+      jumpUnitVector <- shiftPattern
+      newX = thisLocVector.x + (jumpUnitVector.x * thisPrecVector.x * 2.0)
+      newY = thisLocVector.y + (jumpUnitVector.y * thisPrecVector.y * 2.0)
+    } yield new Coordinate(newX,newY)
 
+    val safeCoords = newCoords.flatMap { generateIDLSafeCoordinates }.flatMap
+                                                      { generatePolarSafeCoordinates(_,thisPrecVector,thisLocVector) }
+    safeCoords.map{ coord => GeoHash(coord.x,coord.y,thisPrec)}
+  }
+  // handles cases where the seed geohash is in contact with the antimeridan
+  def generateIDLSafeCoordinates(xyPair: Coordinate): Set[Coordinate]  =
+             if (math.abs(xyPair.x) > 180.0) generateIDLMirrorPair(xyPair) else Set(xyPair)
+  // handles cases where the seed geohash is in contact with a pole
+  def generatePolarSafeCoordinates(xyPair: Coordinate ,
+                                   precVector:Coordinate,
+                                   startingPair:Coordinate ): Set[Coordinate] =
+             if (math.abs(xyPair.y) > 90.0) polarCap(xyPair, precVector,startingPair) else Set(xyPair)
+  // use symmetry about the antimeridan to find the correct coordinate on the other side
+  def generateIDLMirrorPair(xyPair:Coordinate): Set[Coordinate] = {
+      val newLat= xyPair.y
+      val newLon= xyPair.x + degreesLonTranslation(xyPair.x)
+      Set(new Coordinate (newLon,newLat))
+  }
+  // generate a Set of GeoHashes which all touch this pole, at the same precision as the seed
+  def polarCap(                    xyPair :Coordinate,
+                                   precVector:Coordinate ,
+                                   startingPair:Coordinate ): Set[Coordinate]   = {
+      val newLat = startingPair.y  // should be the original
+      // see today's chat to find a better way to do this.
+      val newLons = NumericRange(-180.0 + precVector.x, 180.0- precVector.x, 2.0* precVector.x) // should be the centers of all GHs in lat
+      newLons.map(newLon => new Coordinate(newLon,newLat)).toSet
+  }
   // taken from inside  getInternationalDateLineSafeGeometry
   // FIXME refactor the above to expose the method
   def degreesLonTranslation(lon: Double): Double = (((lon + 180) / 360.0).floor * -360).toInt
@@ -57,60 +70,5 @@ object TouchingGeoHashes {
 }
 
 
-    //val newCoords = shiftPattern.map {jumpUnitVector => safeJump(jumpUnitVector, thisLonPrec, thisLatPrec, thisLoc) }
-
-    //val newCoords = shiftPattern.map { jumpVector => safeJump(2.0 * thisLonPrec * x, 2.0 * thisLatPrec * y)}
-  }
 
 
-
-  def safeJump(jumpUnitVector: DenseVector[Double], precVector: DenseVector[Double] , oldLocation: DenseVector[Double]) = {
-    val scaledJumpVector = jumpUnitVector :* precVector :* 2.0
-    val newLocation = oldLocation + scaledJumpVector
-
-}
-
-object OldTouchingMethod {
-  // return all GeoHashes of the same precision that are in contact with this one,
-  def touching(gh: GeoHash): Seq[GeoHash] = {
-    val thisLoc = gh.getPoint
-    val thisPrec = gh.prec
-    val thisLatPrec = GeoHash.latitudeDeltaForPrecision(thisPrec)
-    val thisLonPrec = GeoHash.longitudeDeltaForPrecision(thisPrec)
-    // get the precision (is lat and lon degrees the same?)
-    // get the GeoHashes that lie -1<x<1 and -1<y<1 from this one,
-    // treating the bonds at the poles and antimeridian correctly
-    // this needs to filter out the (0,0) case
-    val shiftPattern = for {
-      i <- List(-1, 0, 1)
-      j <- List(-1, 0, 1)
-    } yield (i, j)
-    // get a list of new coordinates
-    // NOTE THAT BLINDY JUMPING BY TWICE THE PRECISION IS NOT GOING TO PLACE
-    // the position squarely into the next geohash.
-    // I need to check that there are no overshoots.
-    val newCoordShifts = shiftPattern.map { shift => (2.0 * thisLonPrec * x, 2.0 * thisLatPrec * y)}
-    // apply the coordinate shifts to the center point
-    // if there are any that extend to the pole, I need to wrap around the pole completely
-    // by taking the original latitude and cycling through all longs
-    // if there are any that jump over the antimeridian, I need to
-    // just flip the sign of the longitude.
-
-    def handlePoles(newPoint: Point): List[Point] = {
-      if poleCrossing(newPoint) {
-        generatePoleWrap(thisLoc, thisPrec) // we actually don't care if we've also jumped over the meridian in this case
-      }
-      else if antimeridianCrossing(newPoint)
-      else
-        List(newPoint)
-    }
-    def poleCrossing(aPoint: Point): Boolean = math.abs(aPoint.getY) > 90
-    def antimeridianCrossing(aPoint: Point): Boolean = math.abs(aPoint.getX) > 180
-    def generatePoleWrap(aPoint: Point, aPrec: Int): List[Point] = {
-      val aLat = aPoint.getY // extract  the latitude of the original point -- it will be used for the wrap
-      val lonDelta = GeoHash.lonDeltaMap(aPrec) // get a array of all longitude centers
-      //powersOf2Map(aPrec)//
-      // I need to confirm that this works.
-      val allLongtitudes = NumericRange(-180 + lonDelta, 180.- lonDelta, 2.* lonDelta)
-      // generate the list
-    }
