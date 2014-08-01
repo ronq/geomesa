@@ -66,38 +66,21 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHash],
                      val distance: (GeoHash) => Double,
                      var statefulFilterRadius: Double  ) extends GeoHashDistanceFilter with Iterator[GeoHash] {
 
+  // this is not efficient, look at on deck pattern instead
+  // check that at least one element in pq will pass the distance filter
+  def hasNext: Boolean = pq.exists{statefulDistanceFilter}
+  // this is not efficient, look at on deck pattern instead
+  def next(): GeoHash =
+  {for {
+      newGH <- pq.dequeuingFind { statefulDistanceFilter } // get the next element in the queue that passes the filter
+      _      = TouchingGeoHashes.touching(newGH).filter { statefulDistanceFilter } foreach {gh:GeoHash => pq.enqueue(gh)} // insert the same from the generator
+    } yield newGH}.head
+
+
+
   def updateDistance(theNewMaxDistance: Double) {
     if (theNewMaxDistance < statefulFilterRadius) statefulFilterRadius = theNewMaxDistance
   }
-
-
-
-  // Note that next returns an Option. There is then no need to define hasNext.
-  def next(): Option[GeoHash] =
-    for {
-      newGH <- pq.dequeuingFind { statefulDistanceFilter } // get the next element in the queue that passes the filter
-      _      = TouchingGeoHashes(newGH).find { statefulDistanceFilter } foreach {gh:GeoHash => pq.enqueue(gh)} // insert the same from the iterator
-    } yield newGH
-  /**
-  def toList(): List[GeoHash] = {getNext(List[GeoHash]()) }
-  //@tailrec
-  private def getNext(ghList: List[GeoHash]): List[GeoHash] = {
-      next() match {
-        case None => ghList
-        case Some(element) => getNext(element::ghList)
-      }
-    }
-  // this method is used to load the PriorityQueue with contents from the iterator
-  // this is needed in this case since the iterator only returns results one at a time and hence
-  // next() will not return results in order
-  //@tailrec
-  final def exhaustIterator(): Unit = {
-    it.find { statefulDistanceFilter } match {
-      case None => Unit
-      case Some(element) => pq.enqueue(element); exhaustIterator()
-    }
-  }
-  **/
 }
 
 object EnrichmentPatch {

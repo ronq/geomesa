@@ -15,19 +15,6 @@ import scala.collection.mutable
  * For now, we use the BoundindBoxIterator as the GeoHash iterator.
  * Later, this will switch to the Touching GeoHash Iterator
  */
-trait NearestGeoHash {
-  def distance: GeoHash => Double
-}
-
-trait GeoHashDistanceFilter extends NearestGeoHash {
-  var statefulFilterRadius: Double
-  // removes GeoHashes that are further than a certain distance from the aFeatureForSearch
-  def statefulDistanceFilter(gh: GeoHash): Boolean = { distance(gh) < statefulFilterRadius }
-  // FIXME
-  // from jnh5y: Sans a call to this method, I'd advocate removing it, making the var a val, and moving def distance into this trait.
-  def mutateFilterRadius(radiusCandidate: Double): Unit = 
-  {statefulFilterRadius = math.min(radiusCandidate, statefulFilterRadius)}
-}
 
 object SomeGeoHashes {
   def apply(centerPoint: SimpleFeature, distanceGuess: Double, maxDistance: Double) = {
@@ -85,32 +72,4 @@ class SomeGeoHashes(pq: mutable.PriorityQueue[GeoHash],
       case Some(element) => pq.enqueue(element); exhaustIterator()
     }
   }
-}
-
-object EnrichmentPatch {
-  // It might be nice to make this more general and dispense with the GeoHash type.
-  implicit class EnrichedPQ[A](pq: mutable.PriorityQueue[A]) {
-    @tailrec
-    final def dequeuingFind(func: A => Boolean): Option[A] = {
-      if (pq.isEmpty) None
-      else {
-        val theHead = pq.dequeue()
-        if (func(theHead)) Option(theHead)
-        else dequeuingFind(func)
-      }
-    }
-  }
-
-  /**
-  implicit class EnrichedBBGHI(bbghi: BoundingBoxGeoHashIterator) {
-    final def find(func: GeoHash => Boolean): Option[GeoHash] = {
-      if (!bbghi.hasNext) None
-      else {
-        val theHead = bbghi.next()
-        if (func(theHead)) Option(theHead)
-        else bbghi.find(func)
-      }
-    }
-  }
-  **/
 }
