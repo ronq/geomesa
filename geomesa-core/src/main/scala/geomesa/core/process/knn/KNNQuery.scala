@@ -61,7 +61,7 @@ object KNNQuery {
         newFeatures.foreach{ sf:SimpleFeature => sfPQ.enqueue( (sf,sfPQ.distance(sf)) ) }
 
         // apply filter to ghPQ if we've found k neighbors
-        if (sfPQ.isFull) sfPQ.maxDistance.foreach { x: Double => ghPQ.updateDistance(x)}
+        if (sfPQ.isFull) sfPQ.maxDistance.foreach { x: Double => ghPQ.mutateFilterDistance(x)}
 
         runKNNQuery(source, query, ghPQ, sfPQ)
     }

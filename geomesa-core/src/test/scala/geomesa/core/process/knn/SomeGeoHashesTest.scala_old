@@ -53,7 +53,7 @@ class SomeGeoHashesTest extends Specification {
     "use the statefulDistanceFilter around Charlottesville correctly" in {
       val cvilleSF = generateCvilleSF
       val cvillePQ = SomeGeoHashes(cvilleSF, 1000.0, 1000.0)
-      cvillePQ.updateDistance(0.004)  // units are degrees, so distance is cartesian
+      cvillePQ.mutateFilterDistance(0.004)  // units are degrees, so distance is cartesian
       cvillePQ.exhaustIterator() // call this so that the PriorityQueue can order ALL geohashes
       val numHashesAfterFilter = cvillePQ.toList().length
       numHashesAfterFilter must equalTo(6)
@@ -64,7 +64,7 @@ class SomeGeoHashesTest extends Specification {
       val cvilleSF = generateCvilleSF
       val cvillePQ = SomeGeoHashes(cvilleSF, 1000.0, 1000.0)
       cvillePQ.exhaustIterator() // call this so that the PriorityQueue can order ALL geohashes
-      cvillePQ.updateDistance(0.004)  // units are degrees, so distance is cartesian
+      cvillePQ.mutateFilterDistance(0.004)  // units are degrees, so distance is cartesian
       val numHashesAfterFilter = cvillePQ.toList().length
       numHashesAfterFilter must equalTo(6)
 
