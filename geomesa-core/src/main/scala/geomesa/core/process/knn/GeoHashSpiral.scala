@@ -84,37 +84,6 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   // I may not want to see the oldGH just yet
   val oldGH = new mutable.HashSet[GeoHash] ++ pq.toSet[GeoHashWithDistance].map{_.gh}
 
-  /**
-  // this is not efficient, look at on deck pattern instead
-  // check that at least one element in pq will pass the distance filter
-  def hasNext: Boolean = pq.exists{statefulDistanceFilter}
-  // this is not efficient, look at on deck pattern instead
-  def next(): GeoHash =
-  { for {
-      newGH <- pq.dequeuingFind { statefulDistanceFilter } // get the next element in the queue that passes the filter
-      _      = TouchingGeoHashes.touching(newGH). filter { statefulDistanceFilter } foreach {gh:GeoHash => pq.enqueue(gh)} // insert the same from the generator
-    } yield newGH}.head.gh
-  def next2(): GeoHash = {
-    val ret = pq.dequeuingFind {
-      statefulDistanceFilter
-    }
-  **/
-    // if ret is defined
-    //     get the touching geohashes
-    //     for each of those, check if they've already been added.
-    //         if not, THEN check the distance
-    //               if the distance is good:
-    //                add the new geohash to the PQ
-    //                also add it to the list of added GH
-    // ---- but the PriorityQueue is already a set!
-    // if ret is defined
-    //     add ret to the set of added GH
-    //     get the touching geohashes
-    //     for each of those, check if they've already been added.
-    //         if not, THEN check the distance
-    //               if the distance is good:
-    //                add the new geohash to the PQ
-
   var onDeck: Option[GeoHash] = None
   var nextGHFromPQ: Option[GeoHash] = None
   var nextGHFromTouching: Option[GeoHash] = None
@@ -125,18 +94,20 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
     else {
         val theHead = pq.dequeue()
         oldGH += theHead.gh
+        println("oldGH: " + oldGH.map{_.hash})
+        println("pq: " + pq.map{_.gh.hash})
         if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead.gh)
         else loadNextGHFromPQ()
     }
   }
 
   private def loadNextGHFromTouching() {
-    //val touchingGH = TouchingGeoHashes.touching(onDeck.get) // not sure if I want to seed from ondeck
-    val touchingGH = nextGHFromPQ.map(TouchingGeoHashes.touching).get // not sure if I want to seed from ondeck
-    val newTouchingGH = touchingGH.filterNot(oldGH contains )
-    val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH)) }
-    val passingFilter = withDistance.filter(statefulDistanceFilter)
-    passingFilter.foreach{ ghWD => pq.enqueue(ghWD) }
+    // may want to seed from onDeck instead
+    nextGHFromPQ.foreach { newSeedGH =>
+      val newTouchingGH = TouchingGeoHashes.touching(newSeedGH).filterNot(oldGH contains)
+      val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH))}
+      withDistance.filter(statefulDistanceFilter).foreach { ghWD => pq.enqueue(ghWD)}
+    }
   }
 
   private def loadNext() {
@@ -146,10 +117,14 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
     }
   }
 
-  def head = onDeck.getOrElse(throw new Exception)
+  def head = onDeck match {
+    case Some(nextGH) => nextGH
+    case None => throw new Exception
+  }
+
   def hasNext = onDeck.isDefined
-  def next() = {loadNext()
-               onDeck.getOrElse(throw new Exception)  }
+
+  def next() = head match {case nextGH:GeoHash => loadNext() ; nextGH }
 
   loadNextGHFromPQ()
   loadNextGHFromTouching()
