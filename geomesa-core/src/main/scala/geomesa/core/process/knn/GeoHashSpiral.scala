@@ -4,7 +4,7 @@ import com.vividsolutions.jts.geom.Point
 import geomesa.utils.geotools.GeometryUtils.distanceDegrees
 
 //import collection.JavaConverters._
-import geomesa.core.process.knn.EnrichmentPatch._
+//import geomesa.core.process.knn.EnrichmentPatch._
 import geomesa.utils.geohash._
 import geomesa.utils.geotools.Conversions.RichSimpleFeature
 import org.opengis.feature.simple.SimpleFeature
@@ -82,7 +82,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
                      var statefulFilterDistance: Double,
                      val distanceConversion: (Double) => Double) extends GeoHashDistanceFilter with BufferedIterator[GeoHash] {
   // I may not want to see the oldGH just yet
-  val oldGH = new mutable.HashSet[GeoHash] ++ pq.toSet.map{_.gh}
+  val oldGH = new mutable.HashSet[GeoHash] ++ pq.toSet[GeoHashWithDistance].map{_.gh}
 
   /**
   // this is not efficient, look at on deck pattern instead
@@ -118,6 +118,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   var onDeck: Option[GeoHash] = None
   var nextGHFromPQ: Option[GeoHash] = None
   var nextGHFromTouching: Option[GeoHash] = None
+
   @tailrec
   private def loadNextGHFromPQ() {
     if (pq.isEmpty) nextGHFromPQ = None
@@ -130,7 +131,8 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   }
 
   private def loadNextGHFromTouching() {
-    val touchingGH = TouchingGeoHashes.touching(onDeck.get) // not sure if I want to seed from ondeck
+    //val touchingGH = TouchingGeoHashes.touching(onDeck.get) // not sure if I want to seed from ondeck
+    val touchingGH = nextGHFromPQ.map(TouchingGeoHashes.touching).get // not sure if I want to seed from ondeck
     val newTouchingGH = touchingGH.filterNot(oldGH contains )
     val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH)) }
     val passingFilter = withDistance.filter(statefulDistanceFilter)
@@ -148,6 +150,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   def hasNext = onDeck.isDefined
   def next() = {loadNext()
                onDeck.getOrElse(throw new Exception)  }
+
   loadNextGHFromPQ()
   loadNextGHFromTouching()
   loadNext()

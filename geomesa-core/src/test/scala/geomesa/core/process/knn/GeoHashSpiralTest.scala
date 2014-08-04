@@ -30,7 +30,7 @@ class GeoHashSpiralTest extends Specification {
 
     "order GeoHashes correctly around Charlottesville" in {
       val cvilleSF = generateCvilleSF
-      val cvillePQ = GeoHashSpiral(cvilleSF, 1000.0, 1000.0)
+      val cvillePQ = GeoHashSpiral(cvilleSF, 1000.0, 5000.0)
       while (cvillePQ.hasNext) {
         val newGH=cvillePQ.next()
         println (newGH.hash + "--" + newGH.prec + "--" + cvillePQ.distance(newGH))
