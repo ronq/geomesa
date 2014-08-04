@@ -68,11 +68,11 @@ object GeoHashSpiral extends GeoHashAutoSize {
     def distanceCalc(gh: GeoHash) = centerPoint.point.distance(gh.geom)
     //def orderedGH: Ordering[GeoHashWithDistance] = Ordering.by { gh: GeoHash => distanceCalc(gh)}
     //def orderedGH: Ordering[GeoHashWithDistance] = Ordering.by {_.dist}.reverse
-    def orderedGH: Ordering[GeoHashWithDistance] = Ordering.by {_.dist}
+    def orderedGH: Ordering[GeoHashWithDistance] = Ordering.by { _.dist}
     def metersConversion(meters: Double) =  distanceDegrees(centerPoint.point, meters)
 
     // Create a new GeoHash PriorityQueue and enqueue the first GH from the iterator as a seed.
-    val ghPQ = new mutable.PriorityQueue[GeoHashWithDistance]()(orderedGH) { enqueue(seedWithDistance) }
+    val ghPQ = new mutable.PriorityQueue[GeoHashWithDistance]()(orderedGH.reverse) { enqueue(seedWithDistance) }
     new GeoHashSpiral(ghPQ, distanceCalc, maxDistance, metersConversion)
   }
 }
@@ -82,7 +82,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
                      var statefulFilterDistance: Double,
                      val distanceConversion: (Double) => Double) extends GeoHashDistanceFilter with BufferedIterator[GeoHash] {
   // I may not want to see the oldGH just yet
-  val oldGH = new mutable.HashSet[GeoHash] ++ pq.toSet[GeoHashWithDistance].map{_.gh}
+  val oldGH = new mutable.HashSet[GeoHash] ++= pq.toSet[GeoHashWithDistance].map{_.gh}
 
   var onDeck: Option[GeoHash] = None
   var nextGHFromPQ: Option[GeoHash] = None
@@ -93,9 +93,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
     if (pq.isEmpty) nextGHFromPQ = None
     else {
         val theHead = pq.dequeue()
-        oldGH += theHead.gh
-        println("oldGH: " + oldGH.map{_.hash})
-        println("pq: " + pq.map{_.gh.hash})
+        //oldGH += theHead.gh
         if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead.gh)
         else loadNextGHFromPQ()
     }
@@ -104,10 +102,21 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   private def loadNextGHFromTouching() {
     // may want to seed from onDeck instead
     nextGHFromPQ.foreach { newSeedGH =>
+      // obtain only new GeoHashes that touch
       val newTouchingGH = TouchingGeoHashes.touching(newSeedGH).filterNot(oldGH contains)
+      // enrich the GeoHashes with distances
       val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH))}
-      withDistance.filter(statefulDistanceFilter).foreach { ghWD => pq.enqueue(ghWD)}
+      val withinDistance = withDistance.filter(statefulDistanceFilter)
+      // add all GeoHashes which pass the filter to the PQ
+      withinDistance.foreach { ghWD => pq.enqueue(ghWD)}
+      // also add the GeoHashes to the set of old GeoHashes
+      // note: we add newTouchingGH now, since the cost of having many extra GeoHashes will likely
+      // be less than that of computing the distance for the same GeoHash multiple times,
+      // which is what happens if withinDistance is used.
+      oldGH ++= newTouchingGH
     }
+    //println("pq :" + pq.map{_.gh.hash} )
+    //println("oldGH :" + oldGH.map{_.hash} )
   }
 
   private def loadNext() {
