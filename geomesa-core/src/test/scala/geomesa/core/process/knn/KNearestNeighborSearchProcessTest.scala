@@ -1,14 +1,14 @@
 package geomesa.core.process.knn
 
 import geomesa.feature.AvroSimpleFeatureFactory
-import geomesa.utils.geotools.Conversions._
+import org.geotools.filter.text.ecql.ECQL
 import collection.JavaConversions._
 
 import geomesa.core.data.{AccumuloFeatureStore, AccumuloDataStore}
 import geomesa.core.index.{IndexSchemaBuilder, Constants}
 
 import geomesa.utils.text.WKTUtils
-import org.geotools.data.{DataUtilities, DataStoreFinder}
+import org.geotools.data.{Query, DataUtilities, DataStoreFinder}
 import org.geotools.factory.Hints
 import org.geotools.feature.DefaultFeatureCollection
 import org.joda.time.DateTime
@@ -56,22 +56,21 @@ class KNearestNeighborSearchProcessTest extends Specification {
 
   val featureCollection = new DefaultFeatureCollection(sftName, sft)
 
-
   val clusterOfPoints = List[TestEntry](
     TestEntry("POINT( -78.503547 38.035475 )", "rotunda"),
     TestEntry("POINT( -78.503923 38.035536 )", "pavilion I"),
-    TestEntry("POINT( -78.504059 38.035308 )", "pavilion I"),
-    TestEntry("POINT( -78.504276 38.034971 )", "pavilion III"),
-    TestEntry("POINT( -78.504424 38.034628 )", "pavilion V"),
-    TestEntry("POINT( -78.504617 38.034208 )", "pavilion VII"),
-    TestEntry("POINT( -78.503833 38.033938 )", "pavilion IX"),
-    TestEntry("POINT( -78.503601 38.034343 )", "pavilion X"),
-    TestEntry("POINT( -78.503424 38.034721 )", "pavilion VIII"),
-    TestEntry("POINT( -78.503180 38.035039 )", "pavilion VI"),
-    TestEntry("POINT( -78.503109 38.035278 )", "pavilion IV"),
-    TestEntry("POINT( -78.505152 38.032704 )", "pavilion II"),
-    TestEntry("POINT( -78.510295 38.034283 )", "cabell"),
-    TestEntry("POINT( -78.522288 38.032844 )", "beams"),
+    TestEntry("POINT( -78.504059 38.035308 )", "pavilion III"),
+    TestEntry("POINT( -78.504276 38.034971 )", "pavilion V"),
+    TestEntry("POINT( -78.504424 38.034628 )", "pavilion VII"),
+    TestEntry("POINT( -78.504617 38.034208 )", "pavilion IX"),
+    TestEntry("POINT( -78.503833 38.033938 )", "pavilion X"),
+    TestEntry("POINT( -78.503601 38.034343 )", "pavilion VIII"),
+    TestEntry("POINT( -78.503424 38.034721 )", "pavilion VI"),
+    TestEntry("POINT( -78.503180 38.035039 )", "pavilion IV"),
+    TestEntry("POINT( -78.503109 38.035278 )", "pavilion II"),
+    TestEntry("POINT( -78.505152 38.032704 )", "cabell"),
+    TestEntry("POINT( -78.510295 38.034283 )", "beams"),
+    TestEntry("POINT( -78.522288 38.032844 )", "mccormick"),
     TestEntry("POINT( -78.520019 38.034511 )", "hep")
   )
 
@@ -112,6 +111,20 @@ class KNearestNeighborSearchProcessTest extends Specification {
       sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
       sf
   }
+  def wideQuery = {
+    val lat = 38.0
+    val lon = -78.50
+    val siteSize = 5.0
+    val minLat = lat - siteSize
+    val maxLat = lat + siteSize
+    val minLon = lon - siteSize
+    val maxLon = lon + siteSize
+    val queryString = s"BBOX(geom,$minLon, $minLat, $maxLon, $maxLat)"
+    val ecqlFilter = ECQL.toFilter(queryString)
+    //val fs = getTheFeatureSource(tableName, featureName)
+    //new Query(featureName, ecqlFilter, transform)
+    new Query(sftName, ecqlFilter)
+  }
 
   // begin tests 
 
@@ -121,7 +134,7 @@ class KNearestNeighborSearchProcessTest extends Specification {
       inputFeatures.add( queryFeature("fan mountain",37.878219,-78.692649 ))
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-        knn.execute(inputFeatures, dataFeatures, 5, 50,  10000.0).size must equalTo(0)
+        knn.execute(inputFeatures, dataFeatures, 5, 500.0,  10000.0).size must equalTo(0)
     }
 
 
@@ -130,7 +143,7 @@ class KNearestNeighborSearchProcessTest extends Specification {
        inputFeatures.add( queryFeature("madison", 38.036871, -78.502720))
        val dataFeatures = fs.getFeatures()
        val knn = new KNearestNeighborSearchProcess
-       knn.execute(inputFeatures, dataFeatures, 15, 50,  400.0).size should be equalTo 11
+       knn.execute(inputFeatures, dataFeatures, 15, 50.0,  400.0).size should be equalTo 11
     }
 
     // this will not work until the KNN search is completely functional
@@ -155,14 +168,39 @@ class KNearestNeighborSearchProcessTest extends Specification {
       inputFeatures.add( queryFeature("blackfriars", 38.149185, -79.070569 ) )
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-      knn.execute(inputFeatures, dataFeatures, 5, 50,  5000.0).size must greaterThan(0)
+      knn.execute(inputFeatures, dataFeatures, 5, 500.0,  5000.0).size must greaterThan(0)
     }
 
     "handle an empty query point collection" in {
       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-      knn.execute(inputFeatures, dataFeatures, 5, 50,  5000.0).size must equalTo(0)
+      knn.execute(inputFeatures, dataFeatures, 5, 500.0,  5000.0).size must equalTo(0)
+    }
+  }
+  "runNewKNNQuery" should {
+    "return a NearestNeighbors object with features in correct order" in {
+      val knnResults = KNNQuery.runNewKNNQuery(fs, wideQuery, 20, 50.0, 2500.0, queryFeature("madison", 38.036871, -78.502720))
+      val knnFeatures = knnResults.dequeueAll.map{_._1}
+      val knnIDs = knnFeatures.map{_.getID}
+
+      val orderedFeatureIDs =List("rotunda",
+        "pavilion II",
+        "pavilion I",
+        "pavilion IV",
+        "pavilion III",
+        "pavilion VI",
+        "pavilion V",
+        "pavilion VII",
+        "pavilion VIII",
+        "pavilion IX",
+        "pavilion X",
+        "cabell",
+        "beams",
+        "hep",
+        "mccormick")
+      knnIDs must equalTo(orderedFeatureIDs)
+
     }
   }
 

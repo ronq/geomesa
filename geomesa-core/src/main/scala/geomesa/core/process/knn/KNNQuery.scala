@@ -25,7 +25,7 @@ object KNNQuery {
                      maxDistance: Double,
                      aFeatureForSearch: SimpleFeature): mutable.PriorityQueue[(SimpleFeature, Double)] = {
 
-    // setup the GHSpiralr -- it requires the search point and the searchRadius
+    // setup the GHSpiral -- it requires the search point and the searchRadius
     val geoHashPQ = GeoHashSpiral(aFeatureForSearch, searchDistance, maxDistance)
 
     // setup the stateful object for record keeping
@@ -62,7 +62,7 @@ object KNNQuery {
 
         // apply filter to ghPQ if we've found k neighbors
         if (sfPQ.isFull) sfPQ.maxDistance.foreach { x: Double => ghPQ.mutateFilterDistance(x)}
-
+        //println ("KNN Status:" + newGH.hash + " " + sfPQ.maxDistance.getOrElse(0.0) +" " + sfPQ.length )
         runKNNQuery(source, query, ghPQ, sfPQ)
     }
   }

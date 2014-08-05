@@ -14,10 +14,11 @@ import scala.collection.mutable
 
 case class GeoHashWithDistance(gh: GeoHash, dist: Double)
 /**
- * Object and Class to mock up a generator for the GeoHash "Spiral"
+ * Object and Class for the GeoHashSpiral
  *
- * For now, we use the BoundindBoxIterator as the GeoHash iterator.
- * Later, this will switch to the Touching GeoHash Iterator
+ * This provides a Iterator[GeoHash] which generates GeoHashes in order from the distance from a single point
+ * Currently the ordering is according to the Cartesian distance, NOT the geodetic distance
+ * However the provided filter interface does use geodetic distance
  */
 
 trait NearestGeoHash {
@@ -84,17 +85,16 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   // I may not want to see the oldGH just yet
   val oldGH = new mutable.HashSet[GeoHash] ++= pq.toSet[GeoHashWithDistance].map{_.gh}
 
-  var onDeck: Option[GeoHash] = None
-  var nextGHFromPQ: Option[GeoHash] = None
-  var nextGHFromTouching: Option[GeoHash] = None
+  var onDeck: Option[GeoHashWithDistance] = None
+  var nextGHFromPQ: Option[GeoHashWithDistance] = None
+  var nextGHFromTouching: Option[GeoHashWithDistance] = None
 
   @tailrec
   private def loadNextGHFromPQ() {
     if (pq.isEmpty) nextGHFromPQ = None
     else {
         val theHead = pq.dequeue()
-        //oldGH += theHead.gh
-        if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead.gh)
+        if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead)
         else loadNextGHFromPQ()
     }
   }
@@ -103,7 +103,7 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
     // may want to seed from onDeck instead
     nextGHFromPQ.foreach { newSeedGH =>
       // obtain only new GeoHashes that touch
-      val newTouchingGH = TouchingGeoHashes.touching(newSeedGH).filterNot(oldGH contains)
+      val newTouchingGH = TouchingGeoHashes.touching(newSeedGH.gh).filterNot(oldGH contains)
       // enrich the GeoHashes with distances
       val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH))}
       val withinDistance = withDistance.filter(statefulDistanceFilter)
@@ -115,8 +115,6 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
       // which is what happens if withinDistance is used.
       oldGH ++= newTouchingGH
     }
-    //println("pq :" + pq.map{_.gh.hash} )
-    //println("oldGH :" + oldGH.map{_.hash} )
   }
 
   private def loadNext() {
@@ -125,13 +123,13 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
       case (Some(x)) => loadNextGHFromPQ(); loadNextGHFromTouching(); onDeck = Some(x)
     }
   }
-
-  def head = onDeck match {
-    case Some(nextGH) => nextGH
+  // filter applied here to account for mutations in the filter AFTER onDeck is loaded
+  def head = onDeck.filter(statefulDistanceFilter) match {
+    case Some(nextGH) => nextGH.gh
     case None => throw new Exception
   }
-
-  def hasNext = onDeck.isDefined
+  // filter applied here to account for mutations in the filter AFTER onDeck is loaded
+  def hasNext = onDeck.filter(statefulDistanceFilter).isDefined
 
   def next() = head match {case nextGH:GeoHash => loadNext() ; nextGH }
 
@@ -139,20 +137,3 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   loadNextGHFromTouching()
   loadNext()
 }
-
-/**
-object EnrichmentPatch {
-  // It might be nice to make this more general and dispense with the GeoHash type.
-  implicit class EnrichedPQ[A](pq: mutable.PriorityQueue[A]) {
-    //@tailrec
-    final def dequeuingFind(func: A => Boolean): Option[A] = {
-      if (pq.isEmpty) None
-      else {
-        val theHead = pq.dequeue()
-        if (func(theHead)) Option(theHead)
-        else dequeuingFind(func)
-      }
-    }
-  }
-}
-**/
