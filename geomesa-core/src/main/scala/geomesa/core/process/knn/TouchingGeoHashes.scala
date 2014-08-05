@@ -55,7 +55,7 @@ object TouchingGeoHashes {
   }
 
   // taken from inside  getInternationalDateLineSafeGeometry
-  // FIXME refactor the above to expose the method
+  // FIXME refactorgetInternationalDateLineSafeGeometry to expose the method
   def degreesLonTranslation(lon: Double): Double = (((lon + 180) / 360.0).floor * -360).toInt
 
   // handles cases where the seed geohash is in contact with a pole
