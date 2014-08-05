@@ -22,8 +22,6 @@ case class TestEntry(wkt: String, id: String, dt: DateTime = new DateTime())
 @RunWith(classOf[JUnitRunner])
 class KNearestNeighborSearchProcessTest extends Specification {
 
-  sequential
-
   val sftName = "geomesaKNNTestType"
   val sft = DataUtilities.createType(sftName, index.spec)
   sft.getUserData.put(Constants.SF_PROPERTY_START_TIME,"dtg")

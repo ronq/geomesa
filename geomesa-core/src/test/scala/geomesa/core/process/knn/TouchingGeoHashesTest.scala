@@ -8,8 +8,6 @@ import org.specs2.runner.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class TouchingGeoHashesTest extends Specification {
 
-  sequential
-
   def generateCvilleGH = {
     val precision = 30
     val lat = 38.0752150

@@ -68,7 +68,9 @@ object GeoHashSpiral extends GeoHashAutoSize {
 
     // Create a new GeoHash PriorityQueue and enqueue with a seed.
     val ghPQ = new mutable.PriorityQueue[GeoHashWithDistance]()(orderedGH.reverse) { enqueue(seedWithDistance) }
+
     new GeoHashSpiral(ghPQ, distanceCalc, maxDistance, metersConversion)
+
   }
 }
 
@@ -76,15 +78,17 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
                      val distance: (GeoHash) => Double,
                      var statefulFilterDistance: Double,
                      val distanceConversion: (Double) => Double) extends GeoHashDistanceFilter with BufferedIterator[GeoHash] {
+
   // running set of GeoHashes which have already been encountered -- used to prevent visiting a GeoHash more than once
   // TODO: think if this is needed, or if distance ordering/filtering alone is sufficient
   //       the Best Way will depend on if calculating the distance for old GHs is more expensive than
   //       searching through a HashSet
-  val oldGH = new mutable.HashSet[GeoHash] ++= pq.toSet[GeoHashWithDistance].map{_.gh}
+  val oldGH = new mutable.HashSet[GeoHash] ++= pq.toSet[GeoHashWithDistance].map{ _.gh }
 
   // these are used to setup a modified on-deck pattern: a PriorityQueue backed by a generator
   var onDeck: Option[GeoHashWithDistance] = None
   var nextGHFromPQ: Option[GeoHashWithDistance] = None
+
   // prime the on deck pattern
   loadNextGHFromPQ()
   loadNextGHFromTouching()
@@ -95,9 +99,11 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
   private def loadNextGHFromPQ() {
     if (pq.isEmpty) nextGHFromPQ = None
     else {
-        val theHead = pq.dequeue()  // removes elements from pq
-        if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead)
-        else loadNextGHFromPQ()
+      val theHead = pq.dequeue()  // removes elements from pq
+
+      if (statefulDistanceFilter(theHead)) nextGHFromPQ = Option(theHead)
+
+      else loadNextGHFromPQ()
     }
   }
   // method to load the neighbors of the next GeoHash to be visited into the PriorityQueue
@@ -106,12 +112,16 @@ class GeoHashSpiral(pq: mutable.PriorityQueue[GeoHashWithDistance],
     nextGHFromPQ.foreach { newSeedGH =>
       // obtain only *new* GeoHashes that touch
       val newTouchingGH = TouchingGeoHashes.touching(newSeedGH.gh).filterNot(oldGH contains)
+
       // enrich the GeoHashes with distances
       val withDistance = newTouchingGH.map { aGH => GeoHashWithDistance(aGH, distance(aGH))}
+
       // remove the GeoHashes that are located too far away
       val withinDistance = withDistance.filter(statefulDistanceFilter)
+
       // add all GeoHashes which pass the filter to the PQ
       withinDistance.foreach { ghWD => pq.enqueue(ghWD)}
+
       // also add the new GeoHashes to the set of old GeoHashes
       // note: we add newTouchingGH now, since the cost of having many extra GeoHashes will likely
       // be less than that of computing the distance for the same GeoHash multiple times,
