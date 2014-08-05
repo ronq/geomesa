@@ -19,7 +19,7 @@ import org.geotools.factory.CommonFactoryFinder
 @RunWith(classOf[JUnitRunner])
 class GenerateKNNQueryTest extends Specification {
 
-  //sequential
+  sequential
 
    def createStore: AccumuloDataStore =
    // the specific parameter values should not matter, as we

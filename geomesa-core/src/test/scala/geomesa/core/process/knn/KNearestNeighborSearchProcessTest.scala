@@ -1,21 +1,20 @@
 package geomesa.core.process.knn
 
+import geomesa.core.data.{AccumuloDataStore, AccumuloFeatureStore}
+import geomesa.core.index
+import geomesa.core.index.{Constants, IndexSchemaBuilder}
 import geomesa.feature.AvroSimpleFeatureFactory
-import org.geotools.filter.text.ecql.ECQL
-import collection.JavaConversions._
-
-import geomesa.core.data.{AccumuloFeatureStore, AccumuloDataStore}
-import geomesa.core.index.{IndexSchemaBuilder, Constants}
-
 import geomesa.utils.text.WKTUtils
-import org.geotools.data.{Query, DataUtilities, DataStoreFinder}
+import org.geotools.data.{DataStoreFinder, DataUtilities, Query}
 import org.geotools.factory.Hints
 import org.geotools.feature.DefaultFeatureCollection
+import org.geotools.filter.text.ecql.ECQL
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 
+import scala.collection.JavaConversions._
 import scala.util.Random
 
 case class TestEntry(wkt: String, id: String, dt: DateTime = new DateTime())
@@ -25,29 +24,9 @@ class KNearestNeighborSearchProcessTest extends Specification {
 
   sequential
 
-  val dtgField = geomesa.core.process.tube.DEFAULT_DTG_FIELD
-
-  val geotimeAttributes = s"*geom:Geometry:srid=4326,$dtgField:Date"
-
-  def createStore: AccumuloDataStore =
-  // the specific parameter values should not matter, as we
-  // are requesting a mock data store connection to Accumulo
-    DataStoreFinder.getDataStore(Map(
-      "instanceId" -> "mycloud",
-      "zookeepers" -> "zoo1:2181,zoo2:2181,zoo3:2181",
-      "user" -> "myuser",
-      "password" -> "mypassword",
-      "auths" -> "A,B,C",
-      "tableName" -> "testwrite",
-      "useMock" -> "true",
-      "indexSchemaFormat" -> new IndexSchemaBuilder("~").randomNumber(3).constant("TEST").geoHash(0, 3).date("yyyyMMdd").nextPart().geoHash(3, 2).nextPart().id().build(),
-      "featureEncoding" -> "avro")).asInstanceOf[AccumuloDataStore]
-
-
   val sftName = "geomesaKNNTestType"
-
-  val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
-  sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = dtgField
+  val sft = DataUtilities.createType(sftName, index.spec)
+  sft.getUserData.put(Constants.SF_PROPERTY_START_TIME,"dtg")
 
   val ds = createStore
   ds.createSchema(sft)
@@ -74,28 +53,44 @@ class KNearestNeighborSearchProcessTest extends Specification {
     TestEntry("POINT( -78.520019 38.034511 )", "hep")
   )
 
-  val distributedPoints = generateTestData(1000,38.149894,-79.073639,0.30)
+  val distributedPoints = generateTestData(1000, 38.149894, -79.073639, 0.30)
+
   // add the test points to the feature collection
   addTestData(clusterOfPoints)
   addTestData(distributedPoints)
 
   // write the feature to the store
-  val res = fs.addFeatures(featureCollection)
+  fs.addFeatures(featureCollection)
+
+
+  def createStore: AccumuloDataStore =
+  // the specific parameter values should not matter, as we
+  // are requesting a mock data store connection to Accumulo
+    DataStoreFinder.getDataStore(Map(
+      "instanceId" -> "mycloud",
+      "zookeepers" -> "zoo1:2181,zoo2:2181,zoo3:2181",
+      "user" -> "myuser",
+      "password" -> "mypassword",
+      "auths" -> "A,B,C",
+      "tableName" -> "testwrite",
+      "useMock" -> "true",
+      "indexSchemaFormat" -> new IndexSchemaBuilder("~").randomNumber(3).constant("TEST").geoHash(0, 3).date("yyyyMMdd").nextPart().geoHash(3, 2).nextPart().id().build(),
+      "featureEncoding" -> "avro")).asInstanceOf[AccumuloDataStore]
 
   // utility method to generate random points about a central point
-  // note that these points with be uniform in cartesian space only
-  def generateTestData(num: Int, centerLat: Double, centerLon: Double, width:Double) = {
-      val rng = new Random(0)
-      (1 to num).map(i => {
-        val wkt = "POINT(" +
-          (centerLon + width * (rng.nextDouble() - 0.5)).toString + " " +
-          (centerLat + width * (rng.nextDouble() - 0.5)).toString + " " +
-          ")"
-        val dt = new DateTime()
-        TestEntry(wkt, (100000 + i).toString, dt)
-      }).toList
+  // note that these points will be uniform in cartesian space only
+  def generateTestData(num: Int, centerLat: Double, centerLon: Double, width: Double) = {
+    val rng = new Random(0)
+    (1 to num).map(i => {
+      val wkt = "POINT(" +
+        (centerLon + width * (rng.nextDouble() - 0.5)).toString + " " +
+        (centerLat + width * (rng.nextDouble() - 0.5)).toString + " " +
+        ")"
+      val dt = new DateTime()
+      TestEntry(wkt, (100000 + i).toString, dt)
+    }).toList
   }
-
+  // load data into the featureCollection
   def addTestData(points: List[TestEntry]) = {
     points.foreach { case e: TestEntry =>
       val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), e.id)
@@ -104,13 +99,14 @@ class KNearestNeighborSearchProcessTest extends Specification {
       featureCollection.add(sf)
     }
   }
-
-  def queryFeature(label:String, lat:Double, lon: Double) = {
-      val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), label)
-      sf.setDefaultGeometry(WKTUtils.read(f"POINT($lon $lat)"))
-      sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
-      sf
+  // generates a single SimpleFeature
+  def queryFeature(label: String, lat: Double, lon: Double) = {
+    val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), label)
+    sf.setDefaultGeometry(WKTUtils.read(f"POINT($lon $lat)"))
+    sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
+    sf
   }
+  // generates a very loose query
   def wideQuery = {
     val lat = 38.0
     val lon = -78.50
@@ -126,65 +122,47 @@ class KNearestNeighborSearchProcessTest extends Specification {
     new Query(sftName, ecqlFilter)
   }
 
-  // begin tests 
+  // begin tests ------------------------------------------------
 
   "GeoMesaKNearestNeighborSearch" should {
     "find nothing within 10km of a single query point " in {
       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
-      inputFeatures.add( queryFeature("fan mountain",37.878219,-78.692649 ))
+      inputFeatures.add(queryFeature("fan mountain", 37.878219, -78.692649))
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-        knn.execute(inputFeatures, dataFeatures, 5, 500.0,  10000.0).size must equalTo(0)
+      knn.execute(inputFeatures, dataFeatures, 5, 500.0, 10000.0).size must equalTo(0)
     }
 
-
-    "find 11 points within 400m of a point when k is set to 15 " in {
-       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
-       inputFeatures.add( queryFeature("madison", 38.036871, -78.502720))
-       val dataFeatures = fs.getFeatures()
-       val knn = new KNearestNeighborSearchProcess
-       knn.execute(inputFeatures, dataFeatures, 15, 50.0,  400.0).size should be equalTo 11
-    }
-
-    // this will not work until the KNN search is completely functional
-    // need bounded NearestNeighborPQ
-    // need fully working distance filter as well, perhaps
-    /**
-    "return the five true nearest neighbors" in {
+    "find 12 points within 400m of a point when k is set to 15 " in {
       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
-      inputFeatures.add( queryFeature("madison", 38.036871, -78.502720))
+      inputFeatures.add(queryFeature("madison", 38.036871, -78.502720))
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-      val knnFeatureList = knn.execute(inputFeatures, dataFeatures, 5, 50,  400.0).features().toList
-      println(knnFeatureList.map{_.getID})
-      knnFeatureList.head.getID must equalTo("rotunda")
-      //println(knnFeatureList.map{_.getID}.toString)
+      knn.execute(inputFeatures, dataFeatures, 15, 50.0, 400.0).size should be equalTo 12
     }
-    **/
+
     "handle three query points, one of which will return nothing" in {
       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
-      inputFeatures.add( queryFeature("madison", 38.036871, -78.502720) )
-      inputFeatures.add( queryFeature("fan mountain",37.878219,-78.692649 ) )
-      inputFeatures.add( queryFeature("blackfriars", 38.149185, -79.070569 ) )
+      inputFeatures.add(queryFeature("madison", 38.036871, -78.502720))
+      inputFeatures.add(queryFeature("fan mountain", 37.878219, -78.692649))
+      inputFeatures.add(queryFeature("blackfriars", 38.149185, -79.070569))
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-      knn.execute(inputFeatures, dataFeatures, 5, 500.0,  5000.0).size must greaterThan(0)
+      knn.execute(inputFeatures, dataFeatures, 5, 500.0, 5000.0).size must greaterThan(0)
     }
 
     "handle an empty query point collection" in {
+
       val inputFeatures = new DefaultFeatureCollection(sftName, sft)
       val dataFeatures = fs.getFeatures()
       val knn = new KNearestNeighborSearchProcess
-      knn.execute(inputFeatures, dataFeatures, 5, 500.0,  5000.0).size must equalTo(0)
+      knn.execute(inputFeatures, dataFeatures, 5, 500.0, 5000.0).size must equalTo(0)
     }
   }
+
   "runNewKNNQuery" should {
     "return a NearestNeighbors object with features in correct order" in {
-      val knnResults = KNNQuery.runNewKNNQuery(fs, wideQuery, 20, 50.0, 2500.0, queryFeature("madison", 38.036871, -78.502720))
-      val knnFeatures = knnResults.dequeueAll.map{_._1}
-      val knnIDs = knnFeatures.map{_.getID}
-
-      val orderedFeatureIDs =List("rotunda",
+      val orderedFeatureIDs = List("rotunda",
         "pavilion II",
         "pavilion I",
         "pavilion IV",
@@ -199,13 +177,12 @@ class KNearestNeighborSearchProcessTest extends Specification {
         "beams",
         "hep",
         "mccormick")
+      val knnResults =
+        KNNQuery.runNewKNNQuery(fs, wideQuery, 20, 50.0, 2500.0, queryFeature("madison", 38.036871, -78.502720))
+      // return the ordered neighbors and extract the SimpleFeatures
+      val knnFeatures = knnResults.dequeueAll.map { _._1}
+      val knnIDs = knnFeatures.map { _.getID }
       knnIDs must equalTo(orderedFeatureIDs)
-
     }
   }
-
-
-
-
-
- }
+}
