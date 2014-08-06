@@ -8,31 +8,19 @@ import scala.collection.GenTraversableOnce
 import scala.collection.JavaConverters._
 
 /**
- * Stub for a Bounded Priority Queue
+ * A simple implemenation of a Bounded Priority Queue, as a wrapper for the Guava MinMaxPriorityQueue
+ *
+ * some methods have been added to make this appear similiar to the Scala collections PriorityQueue
+ *
+ *
  */
-/**
-trait BoundedPriorityQueue[T] extends mutable.PriorityQueue[T] {
-  def maxSize: Int
-
-  def isFull: Boolean = !(length < maxSize)
-
-  def getLast = take(maxSize).lastOption
-
-  /**
-  override def +=(single: T) = {
-    if (isFull) injectWithDequeue(single)
-    else super.+=(single)
-
-  }
-  def injectWithDequeue(single)
-    * */
-}
-**/
 
 class BoundedPriorityQueue[T](val maxSize: Int)(implicit ord: Ordering[T])
   extends Iterable[T] {
 
-  val corePQ = new MinMaxPriorityQueue.Builder[T](ord).maximumSize(maxSize).create[T]()
+  // note that ord.reverse is used in the constructor -- MinMaxPriorityQueue has natural ordering (min first)
+  // while the Scala collections PriorityQueue uses reverse natural ordering (max first)
+  val corePQ = MinMaxPriorityQueue.orderedBy(ord.reverse).maximumSize(maxSize).create[T]()
 
   override def isEmpty = !(corePQ.size > 0 )
 
@@ -52,7 +40,6 @@ class BoundedPriorityQueue[T](val maxSize: Int)(implicit ord: Ordering[T])
   }
 
   def dequeue() = corePQ.poll()
-
 
   def dequeueAll[T1 >: T, That](implicit bf: CanBuildFrom[_, T1, That]): That = {
       val b = bf.apply()

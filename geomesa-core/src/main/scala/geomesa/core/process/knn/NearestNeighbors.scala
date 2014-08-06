@@ -5,7 +5,7 @@ import geomesa.utils.geotools.Conversions.RichSimpleFeature
 import org.opengis.feature.simple.SimpleFeature
 
 
-trait NearestNeighbors[T] {
+trait NearestNeighbors {
   def distance(sf: SimpleFeature): Double
 
   def maxDistance: Option[Double]
@@ -25,14 +25,11 @@ object NearestNeighbors {
 
     def orderedSF: Ordering[(SimpleFeature, Double)] =
       Ordering.by { sfTuple: (SimpleFeature, Double) => sfTuple._2}.reverse
-
-    //new mutable.PriorityQueue[(SimpleFeature, Double)]()(orderedSF) with NearestNeighbors[(SimpleFeature, Double)] {
-
-
-    new BoundedPriorityQueue[(SimpleFeature, Double)](numDesired)(orderedSF) with NearestNeighbors[(SimpleFeature, Double)] {
+    // not sure why
+    new BoundedPriorityQueue[(SimpleFeature, Double)](numDesired)(orderedSF) with NearestNeighbors {
 
       def distance(sf: SimpleFeature) = distanceCalc(sf)
-      //def maxDistance = getLast.map {_._2}
+
       def maxDistance = Option(last).map {_._2}
     }
   }

@@ -6,7 +6,6 @@ import org.geotools.data.Query
 import org.geotools.data.simple.SimpleFeatureSource
 import org.geotools.geometry.jts.ReferencedEnvelope
 import org.opengis.feature.simple.SimpleFeature
-import scala.collection.mutable
 import scala.annotation.tailrec
 
 /**
@@ -23,7 +22,7 @@ object KNNQuery {
                      numDesired: Int,
                      searchDistance: Double,
                      maxDistance: Double,
-                     aFeatureForSearch: SimpleFeature): mutable.PriorityQueue[(SimpleFeature, Double)] = {
+                     aFeatureForSearch: SimpleFeature): BoundedNearestNeighbors[(SimpleFeature, Double)] = {
 
     // setup the GHSpiral -- it requires the search point and the searchRadius
     val geoHashPQ = GeoHashSpiral(aFeatureForSearch, searchDistance, maxDistance)
@@ -45,7 +44,7 @@ object KNNQuery {
   def runKNNQuery(source: SimpleFeatureSource,
                    query: Query,
                    ghPQ: GeoHashSpiral,
-                   sfPQ: NearestNeighbors[(SimpleFeature,Double)]) : NearestNeighbors[(SimpleFeature,Double)] = {
+                   sfPQ: BoundedNearestNeighbors[(SimpleFeature,Double)]) : BoundedNearestNeighbors[(SimpleFeature,Double)] = {
     import geomesa.utils.geotools.Conversions.toRichSimpleFeatureIterator
     // add a filter to the ghPQ if we've already found kNN
     //val newghPQ = if (numDesired <= numFound) ghPQ.withFilter(thing(kNN.maxDistance)) else ghPQ
