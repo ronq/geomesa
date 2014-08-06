@@ -2,16 +2,14 @@ package geomesa.core.process.knn
 
 import com.google.common.collect.MinMaxPriorityQueue
 
-import scala.collection.generic.CanBuildFrom
 import scala.collection.GenTraversableOnce
-
 import scala.collection.JavaConverters._
+import scala.collection.generic.CanBuildFrom
 
 /**
- * A simple implemenation of a Bounded Priority Queue, as a wrapper for the Guava MinMaxPriorityQueue
+ * A simple implementation of a bounded priority queue, as a wrapper for the Guava MinMaxPriorityQueue
  *
- * some methods have been added to make this appear similiar to the Scala collections PriorityQueue
- *
+ * Some methods have been added to make this appear similar to the Scala collections PriorityQueue
  *
  */
 
@@ -26,16 +24,15 @@ class BoundedPriorityQueue[T](val maxSize: Int)(implicit ord: Ordering[T])
 
   override def size = corePQ.size
 
-  override def iterator = corePQ.iterator.asScala
+  def iterator = corePQ.iterator.asScala
 
-  def +=(single: T): BoundedPriorityQueue[T] = {corePQ.add(single) ; this}
+  def +=(single: T)= {corePQ.add(single) ; this}
 
-  def ++(xs: GenTraversableOnce[T]): BoundedPriorityQueue[T] = { this.clone() ++= xs.seq }
+  def ++(xs: GenTraversableOnce[T]) = { this.clone() ++= xs.seq }
 
-  def enqueue(elems: T*): Unit = { this ++= elems }
+  def enqueue(elems: T*) = { this ++= elems }
 
-  def ++=(xs: GenTraversableOnce[T]):  BoundedPriorityQueue[T] = {
-    //corePQ.addAll(xs.toList); this
+  def ++=(xs: GenTraversableOnce[T]) = {
     xs.foreach {this += _} ; this
   }
 
@@ -53,15 +50,11 @@ class BoundedPriorityQueue[T](val maxSize: Int)(implicit ord: Ordering[T])
 
   override def head = corePQ.peek
 
-  def clear(): Unit = corePQ.clear()
+  def clear() = corePQ.clear()
 
   override def toList = this.iterator.toList
 
-    /** This method clones the priority queue.
-      *
-      *  @return  a priority queue with the same elements.
-      */
-  override def clone(): BoundedPriorityQueue[T] = new BoundedPriorityQueue[T](maxSize)(ord) ++= this.iterator
+  override def clone() = new BoundedPriorityQueue[T](maxSize)(ord) ++= this.iterator
 
   def isFull = !(size < maxSize)
 
