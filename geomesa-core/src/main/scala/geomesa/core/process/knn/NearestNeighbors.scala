@@ -18,14 +18,14 @@ trait NearestNeighbors {
 
 object NearestNeighbors {
   def apply(aFeatureForSearch: SimpleFeature, numDesired: Int) = {
-    //def distanceCalc(geom: Geometry) = aFeatureForSearch.point.distance(geom)
 
     def distanceCalc(sf: SimpleFeature) =
       VincentyModel.getDistanceBetweenTwoPoints(aFeatureForSearch.point, sf.point).getDistanceInMeters
 
     def orderedSF: Ordering[(SimpleFeature, Double)] =
       Ordering.by { sfTuple: (SimpleFeature, Double) => sfTuple._2}.reverse
-    // not sure why
+
+    // type aliased to  BoundedNearestNeighbors
     new BoundedPriorityQueue[(SimpleFeature, Double)](numDesired)(orderedSF) with NearestNeighbors {
 
       def distance(sf: SimpleFeature) = distanceCalc(sf)
@@ -35,5 +35,4 @@ object NearestNeighbors {
   }
 }
   // this should include a guard against adding two NearestNeighbor collections which are for different points
-  // override def ++ (that: NearestNeighbors ) =  that.dequeueAll
-  // should override enqueue to prevent more than k elements from being contained
+
