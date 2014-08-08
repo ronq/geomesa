@@ -22,18 +22,14 @@ package geomesa.plugin.ui
 import java.io.File
 
 import com.google.common.io.Files
-import org.apache.accumulo.core.Constants
-import org.apache.accumulo.core.client.{Connector, ZooKeeperInstance, BatchWriterConfig}
-import org.apache.accumulo.core.client.mock.MockInstance
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
+import org.apache.accumulo.core.client.{BatchWriterConfig, Connector, ZooKeeperInstance}
 import org.apache.accumulo.core.data.Mutation
-import org.apache.accumulo.core.security.Authorizations
 import org.apache.accumulo.minicluster.MiniAccumuloCluster
 import org.apache.hadoop.io.Text
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import org.specs2.specification.Step
 
 import scala.collection.JavaConverters._
 
@@ -77,9 +73,14 @@ class GeoMesaDataStoresPageTest extends Specification {
       // have to flush table in order for it to write to metadata table
       connector.tableOperations().flush(table, null, null, true)
 
-      val metadata = GeoMesaDataStoresPage.getTableMetadata(connector, table)
+      val metadata = GeoMesaDataStoresPage.getTableMetadata(connector,
+                                                            "feature",
+                                                            "test",
+                                                             connector.tableOperations().tableIdMap().get("test"),
+                                                            "test table")
 
-      metadata.tableName must be equalTo "test"
+      metadata.table must be equalTo "test"
+      metadata.displayName must be equalTo "test table"
       metadata.numTablets should be equalTo 100
       metadata.numEntries should be equalTo 450
       metadata.numSplits should be equalTo 100

@@ -1,8 +1,12 @@
 package geomesa.core.util
 
 import java.util.Map.Entry
-import org.apache.accumulo.core.client.BatchScanner
+import org.apache.accumulo.core.client.{Scanner, BatchScanner}
 import org.apache.accumulo.core.data.{Key, Value}
+import org.geotools.data.FeatureReader
+import org.opengis.feature.Feature
+import org.opengis.feature.`type`.FeatureType
+import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
 import scala.collection.Iterator
 import scala.collection.JavaConversions._
 
@@ -21,6 +25,13 @@ object CloseableIterator {
     def next()  = iter.next()
     def close() = closeIter()
   }
+
+  // This apply method provides us with a simple interface for creating new CloseableIterators.
+  def apply[A <: Feature, B <: FeatureType](iter: FeatureReader[B, A]) = new CloseableIterator[A] {
+    def hasNext = iter.hasNext
+    def next()  = iter.next()
+    def close() = iter.close()
+  }
 }
 
 import geomesa.core.util.CloseableIterator.empty
@@ -33,8 +44,8 @@ trait CloseableIterator[+A] extends Iterator[A] {
   override def map[B](f: A => B): CloseableIterator[B] = CloseableIterator(super.map(f), self.close)
 
   // NB: Since we wish to be able to close the iterator currently in use, we can't call out to super.flatMap.
-  def flatMap[B](f: A => CloseableIterator[B]): CloseableIterator[B] = new SelfClosingIterator[B] {
-    private var cur: CloseableIterator[B] = empty
+  def ciFlatMap[B](f: A => CloseableIterator[B]): CloseableIterator[B] = new SelfClosingIterator[B] {
+    private var cur: CloseableIterator[B] = if(self.hasNext) f(self.next()) else empty
 
     // Add in the 'SelfClosing' behavior.
     def hasNext: Boolean = {
@@ -70,6 +81,10 @@ object SelfClosingIterator {
     def next(): A = iter.next()
     def close() = closeIter()
   }
+
+  def apply[A](iter: CloseableIterator[A]): SelfClosingIterator[A] = apply(iter, iter.close)
+
+  def apply(s: Scanner): SelfClosingIterator[Entry[Key, Value]] = apply(s.iterator(), s.close)
 }
 
 // This object provides a standard way to wrap BatchScanners in a self-closing and closeable iterator.
