@@ -43,8 +43,12 @@
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
         </dependency>
+        <dependency>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+        </dependency>
 
-        <!-- provided dependencies -->
+      <!-- provided dependencies -->
         <dependency>
             <groupId>org.apache.accumulo</groupId>
             <artifactId>accumulo-core</artifactId>
@@ -90,9 +94,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
+          <groupId>org.apache.accumulo</groupId>
+          <artifactId>accumulo-test</artifactId>
         </dependency>
     </dependencies>
 
@@ -128,12 +131,12 @@
                                     <exclude>it.geosolutions.*:*</exclude>
                                     <exclude>org.jaitools:*</exclude>
                                     <exclude>com.vividsolutions:*</exclude>
-                                    <exclude>commons*:*</exclude>
+                                    <exclude>commons-pool:*</exclude>
+                                    <exclude>commons-codec:*</exclude>
                                     <exclude>net.java.dev:*</exclude>
                                     <exclude>java3d:*</exclude>
                                     <exclude>net.jcip:*</exclude>
                                     <exclude>c3p0:*</exclude>
-                                    <exclude>net.sf.ehcache:*</exclude>
                                     <exclude>jdom:*</exclude>
                                     <exclude>net.java.dev.jsr-275:*</exclude>
                                 </excludes>

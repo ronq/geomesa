@@ -21,13 +21,15 @@ package object core {
   // This first string is used as a SimpleFeature attribute name.
   //  Since we would like to be able to use ECQL filters, we are restricted to letters, numbers, and _'s.
   val DEFAULT_GEOMETRY_PROPERTY_NAME = "SF_PROPERTY_GEOMETRY"
+  val DEFAULT_DTG_PROPERTY_NAME = "dtg"
+  val DEFAULT_DTG_END_PROPERTY_NAME = "dtg_end_time"
 
   val DEFAULT_FEATURE_TYPE = "geomesa.feature.type"
   val DEFAULT_SCHEMA_NAME  = "geomesa.index.schema"
   val DEFAULT_FEATURE_NAME = "geomesa.index.feature"
 
   val INGEST_TABLE_NAME                      = "geomesa.ingest.table"
-  val DEFAULT_POLY_PROPERTY_NAME             = "geomesa.index.poly"
+  val DEFAULT_FILTER_PROPERTY_NAME           = "geomesa.index.filter"
   val DEFAULT_INTERVAL_PROPERTY_NAME         = "geomesa.index.interval"
   val DEFAULT_ATTRIBUTE_NAMES                = "geomesa.index.shapefile.attribute-names"
   val DEFAULT_CACHE_SIZE_NAME                = "geomesa.index.cache-size"
@@ -38,5 +40,6 @@ package object core {
   val GEOMESA_ITERATORS_ECQL_FILTER         = "geomesa.iterators.ecql-filter"
   val GEOMESA_ITERATORS_TRANSFORM           = "geomesa.iterators.transform"
   val GEOMESA_ITERATORS_TRANSFORM_SCHEMA    = "geomesa.iterators.transform.schema"
+  val GEOMESA_ITERATORS_IS_DENSITY_TYPE     = "geomesa.iterators.is-density-type"
 
 }

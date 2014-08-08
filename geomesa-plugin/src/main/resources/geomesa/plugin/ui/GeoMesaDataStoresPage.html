@@ -1,0 +1,68 @@
+<!--
+  ~ Copyright 2014 Commonwealth Computer Research, Inc.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<html>
+  <body>
+    <wicket:extend>
+      <style>
+        .geomesa-status fieldset {
+          border-width: 1px;
+          padding: 10px;
+        }
+        .axis text {
+          font: 10px sans-serif;
+        }
+        .axis path, .axis line {
+          fill: none;
+          stroke: #000;
+          shape-rendering: crispEdges;
+        }
+        .ingest path.line {
+          stroke-width: 2;
+          fill: none;
+        }
+        .chart-header {
+          margin-bottom: 10px;
+          text-align: center;
+          width: 740px;
+        }
+        .geomesa-status svg {
+          margin-bottom: 20px;
+        }
+      </style>
+      <div wicket:id="storeTable"></div>
+      <div class="geomesa-status">
+        <hr style="margin:20px 0">
+        <fieldset>
+          <legend><wicket:message key="GeoMesaDataStoresPage.graphs.label.main"/></legend>
+          <h3 class="chart-header">Number of Entries</h3>
+          <svg class="entries"/>
+          <h3 class="chart-header">Ingest Rate (entries/s)</h3>
+          <svg class="ingest"/>
+          <script type="text/javascript">
+            var color = d3.scale.category10();
+            color.domain(tables.map(function(t) { return t.name; }));
+          </script>
+          <wicket:link><script type="text/javascript" src="js/entries-chart.js"></script></wicket:link>
+          <wicket:link><script type="text/javascript" src="js/ingest-chart.js"></script></wicket:link>
+        </fieldset>
+        <div wicket:id="storeDetails">
+          <div wicket:id="storeMetadata" />
+        </div>
+      </div>
+    </wicket:extend>
+  </body>
+</html>

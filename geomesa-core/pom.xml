@@ -40,6 +40,10 @@
             <artifactId>geomesa-filter-accumulo1.5</artifactId>
         </dependency>
         <dependency>
+            <groupId>geomesa</groupId>
+            <artifactId>geomesa-feature-accumulo1.5</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.geotools</groupId>
             <artifactId>gt-main</artifactId>
         </dependency>
@@ -87,16 +91,6 @@
             <groupId>org.joda</groupId>
             <artifactId>joda-convert</artifactId>
         </dependency>
-        <dependency>
-            <groupId>net.sf.ehcache</groupId>
-            <artifactId>ehcache-core</artifactId>
-        </dependency>
-        <!-- jta is required so scalac can compile ehcache-core which
-             uses jta annotations -->
-        <dependency>
-            <groupId>javax.transaction</groupId>
-            <artifactId>jta</artifactId>
-        </dependency>
 
         <!-- logging -->
         <dependency>
@@ -136,10 +130,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>log4j-over-slf4j</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>findbugs</artifactId>
         </dependency>
         <!-- test dependencies -->
         <dependency>

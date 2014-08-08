@@ -17,33 +17,31 @@
 
 package geomesa.core.data
 
-import collection.JavaConversions._
-import com.vividsolutions.jts.geom.{Polygon, Coordinate}
-import geomesa.core.data.FilterToAccumulo._
+import com.vividsolutions.jts.geom.{Coordinate, Polygon}
 import geomesa.core.index.Constants
+import geomesa.core.iterators.TestData
 import geomesa.utils.geometry.Geometry._
 import geomesa.utils.geotools.Conversions._
+import geomesa.utils.geotools.SimpleFeatureTypes
 import geomesa.utils.text.WKTUtils
 import geomesa.utils.time.Time._
-import org.geotools.data.DataUtilities
 import org.geotools.factory.CommonFactoryFinder
 import org.geotools.filter.text.ecql.ECQL
 import org.geotools.geometry.jts.JTSFactoryFinder
 import org.geotools.referencing.CRS
 import org.geotools.referencing.crs.DefaultGeographicCRS
-import org.geotools.temporal.`object`.{DefaultPosition, DefaultInstant}
-import org.joda.time.{DateTimeZone, DateTime, Interval}
+import org.geotools.temporal.`object`.{DefaultInstant, DefaultPosition}
+import org.joda.time.format.ISODateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone, Interval}
 import org.junit.runner.RunWith
-import org.opengis.filter.{And, Or, Not, Filter}
+import org.opengis.filter.expression.{Expression, Literal}
 import org.opengis.filter.spatial.DWithin
+import org.opengis.filter.temporal.{After, Before, During}
+import org.opengis.filter.{And, Filter, Not, Or}
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import org.opengis.filter.temporal.{Before, After, During}
-import org.joda.time.format.{ISODateTimeFormat, DateTimeFormatter}
-import org.opengis.temporal.Period
-import org.opengis.filter.expression.{Expression, Literal}
-import org.opengis.feature.`type`.AttributeDescriptor
-import org.geotools.filter.LiteralExpression
+
+import scala.collection.JavaConversions._
 
 @RunWith(classOf[JUnitRunner])
 class FilterToAccumuloTest extends Specification {
@@ -51,7 +49,7 @@ class FilterToAccumuloTest extends Specification {
   val WGS84       = DefaultGeographicCRS.WGS84
   val ff          = CommonFactoryFinder.getFilterFactory2
   val geomFactory = JTSFactoryFinder.getGeometryFactory
-  val sft         = DataUtilities.createType("test", "id:Integer,prop:String,dtg:Date,otherGeom:Geometry:srid=4326,*geom:Point:srid=4326")
+  val sft         = SimpleFeatureTypes.createType("test", "id:Integer,prop:String,dtg:Date,otherGeom:Geometry:srid=4326,*geom:Point:srid=4326")
   sft.getUserData.put(Constants.SF_PROPERTY_START_TIME, "dtg")
 
   "BBOX queries" should {
@@ -60,6 +58,14 @@ class FilterToAccumuloTest extends Specification {
       val f2a = new FilterToAccumulo(sft)
       val result = f2a.visit(q)
       result mustEqual Filter.INCLUDE
+    }
+
+    "set the spatial predicate to something that spans across the IDL" in {
+      val q = ff.bbox("geom", -190.0, -10, -170, 10, CRS.toSRS(WGS84))
+      val f2a = new FilterToAccumulo(sft)
+      val result = f2a.visit(q)
+      result.toString mustEqual "[[ geom bbox POLYGON ((-180 -10, -180 10, -170 10, -170 -10, -180 -10)) ]" +
+        " OR [ geom bbox POLYGON ((170 -10, 170 10, 180 10, 180 -10, 170 -10)) ]]"
     }
 
     "set the spatial predicate and remove from the subsequent query" in {
@@ -72,6 +78,14 @@ class FilterToAccumuloTest extends Specification {
       val result = f2a.visit(q)
       result mustEqual ff.like(ff.property("prop"), "foo")
     }
+
+    "set the spatial predicate to be a greater than whole world bbox" in {
+      val q = ff.bbox("geom", -200.0, -100, 200, 100, CRS.toSRS(WGS84))
+      val f2a = new FilterToAccumulo(sft)
+      val result = f2a.visit(q)
+      result.toString mustEqual "[ geom bbox POLYGON ((-200 -100, -200 100, 200 100, 200 -100, -200 -100)) ]"
+    }
+
   }
 
   "DWithin queries" should {
@@ -109,6 +123,28 @@ class FilterToAccumuloTest extends Specification {
       val f2a = new FilterToAccumulo(sft)
       val result = f2a.visit(rectWithin)
       result mustNotEqual Filter.INCLUDE
+    }
+
+    "make a rectangular within filter that spans across the IDL" in {
+      val rectWithin =
+        ff.within(
+          ff.property("geom"),
+          ff.literal(WKTUtils.read("POLYGON((-190 -10,-190 10,-170 10,-170 -10,-190 -10))")))
+      val f2a = new FilterToAccumulo(sft)
+      val result = f2a.visit(rectWithin)
+      result.toString mustEqual "[[ geom within POLYGON ((-180 -10, -180 10, -170 10, -170 -10, -180 -10)) ]" +
+        " OR [ geom within POLYGON ((180 10, 180 -10, 170 -10, 170 10, 180 10)) ]]"
+    }
+
+    "make a non-square polygon within filter that spans across the IDL" in {
+      val rectWithin =
+        ff.within(
+          ff.property("geom"),
+          ff.literal(WKTUtils.read("POLYGON((-190 -10,-190 10,-170 10,-170 -10,-180 -30,-190 -10))")))
+      val f2a = new FilterToAccumulo(sft)
+      val result = f2a.visit(rectWithin)
+      result.toString mustEqual "[[ geom within POLYGON ((-180 -30, -180 10, -170 10, -170 -10, -180 -30)) ]" +
+        " OR [ geom within POLYGON ((180 10, 180 -30, 170 -10, 170 10, 180 10)) ]]"
     }
   }
 
@@ -402,6 +438,50 @@ class FilterToAccumuloTest extends Specification {
 
       f2a.temporalPredicate mustEqual noInterval
       f2a.spatialPredicate mustEqual noPolygon
+    }
+  }
+
+  "FilterToAccumulo" should {
+    "handle default layer preview, bigger than earth, multiple IDL-wrapping geoserver BBOX" in {
+      val spatial = ff.bbox("geom", -230, -110, 230, 110, CRS.toSRS(WGS84))
+      val originalSpatial = ff.bbox("geom", -230, -110, 230, 110, CRS.toSRS(WGS84))
+      val features = TestData.allThePoints.map(e => TestData.createSF(e))
+      val f2a = new FilterToAccumulo(sft)
+      val updatedFilter = f2a.visit(spatial)
+      features.forall(f => originalSpatial.evaluate(f) mustEqual true)
+      features.forall(f => updatedFilter.evaluate(f) mustEqual true)
+    }
+
+    "handle >180 lon diff non-IDL-wrapping geoserver BBOX" in {
+      val spatial = ff.bbox("geom", -100, -90, 100, 90, CRS.toSRS(WGS84))
+      val originalSpatial = ff.bbox("geom", -100, -90, 100, 90, CRS.toSRS(WGS84))
+      val features = TestData.allThePoints.map(e => TestData.createSF(e))
+      val f2a = new FilterToAccumulo(sft)
+      val updatedFilter = f2a.visit(spatial)
+      features.count(f => originalSpatial.evaluate(f)) mustEqual 201
+      features.count(f => updatedFilter.evaluate(f)) mustEqual 201
+    }
+
+    "handle small IDL-wrapping geoserver BBOXes" in {
+      val spatial1 = ff.bbox("geom", -181.1, -90, -175.1, 90, CRS.toSRS(WGS84))
+      val spatial2 = ff.bbox("geom", 175.1, -90, 181.1, 90, CRS.toSRS(WGS84))
+      val binarySpatial = ff.or(spatial1, spatial2)
+      val features = TestData.allThePoints.map(e => TestData.createSF(e))
+      val f2a = new FilterToAccumulo(sft)
+      val updatedFilter = f2a.visit(binarySpatial)
+      features.count(f => binarySpatial.evaluate(f)) mustEqual 10
+      features.count(f => updatedFilter.evaluate(f)) mustEqual 10
+    }
+
+    "handle large IDL-wrapping geoserver BBOXes" in {
+      val spatial1 = ff.bbox("geom", -181.1, -90, 40.1, 90, CRS.toSRS(WGS84))
+      val spatial2 = ff.bbox("geom", 175.1, -90, 181.1, 90, CRS.toSRS(WGS84))
+      val binarySpatial = ff.or(spatial1, spatial2)
+      val features = TestData.allThePoints.map(e => TestData.createSF(e))
+      val f2a = new FilterToAccumulo(sft)
+      val updatedFilter = f2a.visit(binarySpatial)
+      features.count(f => binarySpatial.evaluate(f)) mustEqual 226
+      features.count(f => updatedFilter.evaluate(f)) mustEqual 226
     }
   }
 }

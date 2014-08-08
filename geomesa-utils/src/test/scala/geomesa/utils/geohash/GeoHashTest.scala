@@ -29,6 +29,9 @@ import scala.math._
 class GeoHashTest extends Specification
                           with Logging {
 
+  // set to true to see test output
+  val DEBUG_OUPUT = false
+
   // compute tolerance based on precision
   val precToleranceMap = (0 to 63).map(i => (i, 360.0 * pow(0.5, floor(i/2)))).toMap
   def xTolerance(prec: Int) = precToleranceMap(prec)
@@ -126,7 +129,7 @@ class GeoHashTest extends Specification
       val x : Double = -78.0
       val y : Double = 38.0
       for (precision <- 20 to 63) yield {
-        logger.debug(s"precision: $precision")
+        if(DEBUG_OUPUT) logger.debug(s"precision: $precision")
 
         // encode this value
         val ghEncoded : GeoHash = GeoHash(x, y, precision)
@@ -146,7 +149,7 @@ class GeoHashTest extends Specification
         ghEncoded.bitset must equalTo(ghDecoded.bitset)
         ghEncoded.prec must equalTo(ghDecoded.prec)
 
-        logger.debug(s"decoded: ${ghDecoded.y}, ${ghDecoded.x}; encoded: ${ghEncoded.y}, ${ghEncoded.x}")
+        if(DEBUG_OUPUT) logger.debug(s"decoded: ${ghDecoded.y}, ${ghDecoded.x}; encoded: ${ghEncoded.y}, ${ghEncoded.x}")
 
         // the round-trip geometry must be within tolerance of the original
         ghDecoded.x must beCloseTo(x, xTolerance(precision))
@@ -233,6 +236,60 @@ class GeoHashTest extends Specification
       (2,3) must equalTo(GeoHash.getLatitudeLongitudeSpanCount(GeoHash("dq"), GeoHash("dv"), 10))
       (2,2) must equalTo(GeoHash.getLatitudeLongitudeSpanCount(GeoHash("dq"), GeoHash("dt"), 10))
       (3,1) must equalTo(GeoHash.getLatitudeLongitudeSpanCount(GeoHash("du"), GeoHash("dy"), 10))
+    }
+  }
+
+  "binary-string encoding" should {
+    "go round-trip from string to string" in {
+      val binaryStringIn = "01100101100101000000"
+      val gh = GeoHash.fromBinaryString(binaryStringIn)
+      gh.hash must be equalTo "dqb0"
+      gh.toBinaryString must be equalTo binaryStringIn
+    }
+
+    "go round trip from GH to GH" in {
+      val hashIn = "dqb0"
+      val gh = GeoHash(hashIn)
+      val ghOut = GeoHash.fromBinaryString(gh.toBinaryString)
+      ghOut.hash must be equalTo hashIn
+    }
+  }
+
+  "The point (180.0, 0.5) should be in GeoHash 'x'" in {
+    val gh = GeoHash(180.0, 0.5, 5)
+    gh.hash must be equalTo "x"
+  }
+
+  "The point (180.0, 90.0) should be in GeoHash 'z'" in {
+    val gh = GeoHash(180.0, 90.0, 5)
+    gh.hash must be equalTo "z"
+  }
+
+  "The point (180.0, -90.0) should be in GeoHash 'p'" in {
+    val gh = GeoHash(180.0, -90.0, 5)
+    gh.hash must be equalTo "p"
+  }
+
+  "The point (-180.0, -90.0) should be in GeoHash '0'" in {
+    val gh = GeoHash(-180.0, -90.0, 5)
+    gh.hash must be equalTo "0"
+  }
+
+  "The point (-180.0, 90.0) should be in GeoHash 'b'" in {
+    val gh = GeoHash(-180.0, 90.0, 5)
+    gh.hash must be equalTo "b"
+  }
+
+  "Points outside the world" should {
+    "throw exceptions" in {
+      GeoHash(180.1, 0.0, 5) should throwA[Exception]
+      GeoHash(180.1, 90.1, 5) should throwA[Exception]
+      GeoHash(180.1, -90.1, 5) should throwA[Exception]
+      GeoHash(0.0, 90.1, 5) should throwA[Exception]
+      GeoHash(0.0, -90.1, 5) should throwA[Exception]
+      GeoHash(-180.1, 0.0, 5) should throwA[Exception]
+      GeoHash(-180.1, 90.1, 5) should throwA[Exception]
+      GeoHash(-180.1, -90.1, 5) should throwA[Exception]
     }
   }
 }

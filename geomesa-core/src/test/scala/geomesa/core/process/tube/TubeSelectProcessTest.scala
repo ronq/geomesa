@@ -1,21 +1,23 @@
 package geomesa.core.process.tube
 
-import collection.JavaConversions._
-import com.vividsolutions.jts.geom.{Point, Coordinate, GeometryFactory}
-import geomesa.core.data.{AccumuloFeatureStore, AccumuloDataStore}
-import geomesa.core.index.Constants
+import com.vividsolutions.jts.geom.{Coordinate, GeometryFactory, Point}
+import geomesa.core.data.{AccumuloDataStore, AccumuloFeatureStore}
+import geomesa.core.index.{Constants, IndexSchemaBuilder}
+import geomesa.feature.AvroSimpleFeatureFactory
+import geomesa.utils.geotools.SimpleFeatureTypes
 import geomesa.utils.text.WKTUtils
 import org.geotools.data.collection.ListFeatureCollection
-import org.geotools.data.{Query, DataUtilities, DataStoreFinder}
+import org.geotools.data.{DataStoreFinder, Query}
 import org.geotools.factory.Hints
 import org.geotools.feature.DefaultFeatureCollection
-import org.geotools.feature.simple.SimpleFeatureBuilder
 import org.geotools.filter.text.cql2.CQL
-import org.joda.time.{DateTimeZone, DateTime}
+import org.joda.time.{DateTime, DateTimeZone}
 import org.junit.runner.RunWith
 import org.opengis.filter.Filter
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
+
+import scala.collection.JavaConversions._
 
 @RunWith(classOf[JUnitRunner])
 class TubeSelectProcessTest extends Specification {
@@ -29,21 +31,20 @@ class TubeSelectProcessTest extends Specification {
   // the specific parameter values should not matter, as we
   // are requesting a mock data store connection to Accumulo
     DataStoreFinder.getDataStore(Map(
-      "instanceId" -> "mycloud",
-      "zookeepers" -> "zoo1:2181,zoo2:2181,zoo3:2181",
-      "user"       -> "myuser",
-      "password"   -> "mypassword",
-      "auths"      -> "A,B,C",
-      "tableName"  -> "testwrite",
-      "useMock"    -> "true",
-      "featureEncoding" -> "avro")).asInstanceOf[AccumuloDataStore]
-
-
+      "instanceId"        -> "mycloud",
+      "zookeepers"        -> "zoo1:2181,zoo2:2181,zoo3:2181",
+      "user"              -> "myuser",
+      "password"          -> "mypassword",
+      "auths"             -> "A,B,C",
+      "tableName"         -> "testwrite",
+      "useMock"           -> "true",
+      "indexSchemaFormat" -> new IndexSchemaBuilder("~").randomNumber(3).constant("TEST").geoHash(0, 3).date("yyyyMMdd").nextPart().geoHash(3, 2).nextPart().id().build(),
+      "featureEncoding"   -> "avro")).asInstanceOf[AccumuloDataStore]
 
   "TubeSelect" should {
     "should do a simple tube with geo interpolation" in {
       val sftName = "tubeTestType"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
       sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = dtgField
 
       val ds = createStore
@@ -55,7 +56,7 @@ class TubeSelectProcessTest extends Specification {
 
       List("a", "b").foreach { name =>
         List(1, 2, 3, 4).zip(List(45, 46, 47, 48)).foreach { case (i, lat) =>
-          val sf = SimpleFeatureBuilder.build(sft, List(), name + i.toString)
+          val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), name + i.toString)
           sf.setDefaultGeometry(WKTUtils.read(f"POINT($lat%d $lat%d)"))
           sf.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
           sf.setAttribute("type", name)
@@ -80,15 +81,15 @@ class TubeSelectProcessTest extends Specification {
       val f = results.features()
       while (f.hasNext) {
         val sf = f.next
-        sf.getAttribute("type") should equalTo("b")
+        sf.getAttribute("type") mustEqual "b"
       }
 
-      results.size should equalTo(4)
+      results.size mustEqual 4
     }
 
     "should do a simple tube with geo + time interpolation" in {
       val sftName = "tubeTestType"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
       sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = dtgField
 
       val ds = createStore
@@ -98,7 +99,7 @@ class TubeSelectProcessTest extends Specification {
 
       List("c").foreach { name =>
         List(1, 2, 3, 4).zip(List(45, 46, 47, 48)).foreach { case (i, lat) =>
-          val sf = SimpleFeatureBuilder.build(sft, List(), name + i.toString)
+          val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), name + i.toString)
           sf.setDefaultGeometry(WKTUtils.read(f"POINT($lat%d $lat%d)"))
           sf.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-02T00:00:00Z", DateTimeZone.UTC).toDate)
           sf.setAttribute("type", name)
@@ -124,15 +125,15 @@ class TubeSelectProcessTest extends Specification {
       val f = results.features()
       while (f.hasNext) {
         val sf = f.next
-        sf.getAttribute("type") should equalTo("b")
+        sf.getAttribute("type") mustEqual "b"
       }
 
-      results.size should equalTo(4)
+      results.size mustEqual 4
     }
 
     "should properly convert speed/time to distance" in {
       val sftName = "tubetest2"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
       sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = dtgField
 
       val ds = createStore
@@ -146,7 +147,7 @@ class TubeSelectProcessTest extends Specification {
       var i = 0
       List("a", "b").foreach { name =>
         for (lon <- 40 until 50; lat <- 40 until 50) {
-          val sf = SimpleFeatureBuilder.build(sft, List(), name + i.toString)
+          val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), name + i.toString)
           i += 1
           sf.setDefaultGeometry(WKTUtils.read(f"POINT($lon%d $lat%d)"))
           sf.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-02T00:00:00Z", DateTimeZone.UTC).toDate)
@@ -160,7 +161,7 @@ class TubeSelectProcessTest extends Specification {
       val res = fs.addFeatures(featureCollection)
 
       // tube features
-      val tubeFeatures = fs.getFeatures(CQL.toFilter("BBOX(geom, 40, 40, 40, 50) AND type = 'a'"))
+      val tubeFeatures = fs.getFeatures(CQL.toFilter("BBOX(geom, 39.999999999,39.999999999, 40.00000000001, 50.000000001) AND type = 'a'"))
 
       // result set to tube on
       val features = fs.getFeatures(CQL.toFilter("type <> 'a'"))
@@ -174,13 +175,13 @@ class TubeSelectProcessTest extends Specification {
       val f = results.features()
       while (f.hasNext) {
         val sf = f.next
-        sf.getAttribute("type") should equalTo("b")
+        sf.getAttribute("type") mustEqual "b"
         val point = sf.getDefaultGeometry.asInstanceOf[Point]
-        point.getX should be equalTo (40.0)
+        point.getX mustEqual 40.0
         point.getY should be between(40.0, 50.0)
       }
 
-      results.size should equalTo(10)
+      results.size mustEqual 10
     }
 
     "should properly dedup overlapping results based on buffer size " in {
@@ -191,7 +192,7 @@ class TubeSelectProcessTest extends Specification {
       val fs = ds.getFeatureSource(sftName).asInstanceOf[AccumuloFeatureStore]
 
       // tube features
-      val tubeFeatures = fs.getFeatures(CQL.toFilter("BBOX(geom, 40, 40, 40, 50) AND type = 'a'"))
+      val tubeFeatures = fs.getFeatures(CQL.toFilter("BBOX(geom, 39.999999999,39.999999999, 40.00000000001, 50.000000001) AND type = 'a'"))
 
       // result set to tube on
       val features = fs.getFeatures(CQL.toFilter("type <> 'a'"))
@@ -206,20 +207,20 @@ class TubeSelectProcessTest extends Specification {
       val f = results.features()
       while (f.hasNext) {
         val sf = f.next
-        sf.getAttribute("type") should equalTo("b")
+        sf.getAttribute("type") mustEqual "b"
         val point = sf.getDefaultGeometry.asInstanceOf[Point]
         point.getX should be between(40.0, 41.0)
         point.getY should be between(40.0, 50.0)
       }
 
-      results.size should equalTo(20)
+      results.size mustEqual 20
     }
   }
 
   "TubeSelect" should {
     "should handle all geometries" in {
       val sftName = "tubeline"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
       sft.getUserData()(Constants.SF_PROPERTY_START_TIME) = dtgField
 
       val ds = createStore
@@ -231,7 +232,7 @@ class TubeSelectProcessTest extends Specification {
 
       List("b").foreach { name =>
         List(1, 2, 3, 4).zip(List(45, 46, 47, 48)).foreach { case (i, lat) =>
-          val sf = SimpleFeatureBuilder.build(sft, List(), name + i.toString)
+          val sf = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), name + i.toString)
           sf.setDefaultGeometry(WKTUtils.read(f"POINT(40 $lat%d)"))
           sf.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
           sf.setAttribute("type", name)
@@ -240,14 +241,14 @@ class TubeSelectProcessTest extends Specification {
         }
       }
 
-      val bLine = SimpleFeatureBuilder.build(sft, List(), "b-line")
+      val bLine = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), "b-line")
       bLine.setDefaultGeometry(WKTUtils.read("LINESTRING(40 40, 40 50)"))
       bLine.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
       bLine.setAttribute("type", "b")
       bLine.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
       featureCollection.add(bLine)
 
-      val bPoly = SimpleFeatureBuilder.build(sft, List(), "b-poly")
+      val bPoly = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), "b-poly")
       bPoly.setDefaultGeometry(WKTUtils.read("POLYGON((40 40, 41 40, 41 41, 40 41, 40 40))"))
       bPoly.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
       bPoly.setAttribute("type", "b")
@@ -257,7 +258,7 @@ class TubeSelectProcessTest extends Specification {
 
 
       // tube features
-      val aLine = SimpleFeatureBuilder.build(sft, List(), "a-line")
+      val aLine = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), "a-line")
       aLine.setDefaultGeometry(WKTUtils.read("LINESTRING(40 40, 40 50)"))
       aLine.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
 //      aLine.setAttribute("end", new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
@@ -271,7 +272,7 @@ class TubeSelectProcessTest extends Specification {
       // result set to tube on
       val features = fs.getFeatures(CQL.toFilter("type <> 'a'"))
 
-      features.size should equalTo(6)
+      features.size mustEqual 6
 
       // get back type b from tube
       val ts = new TubeSelectProcess()
@@ -280,10 +281,10 @@ class TubeSelectProcessTest extends Specification {
       val f = results.features()
       while (f.hasNext) {
         val sf = f.next
-        sf.getAttribute("type") should equalTo("b")
+        sf.getAttribute("type") mustEqual "b"
       }
 
-      results.size should equalTo(6)
+      results.size mustEqual 6
     }
   }
 
@@ -292,10 +293,10 @@ class TubeSelectProcessTest extends Specification {
       val geoFac = new GeometryFactory
 
       val sftName = "tubeline"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
 
       // calculated km at various latitude by USGS
-      List(0, 30, 60, 89).zip(List(110.57, 110.85, 111.41, 111.69)).foreach { case(lat, dist) =>
+      forall(List(0, 30, 60, 89).zip(List(110.57, 110.85, 111.41, 111.69))) { case(lat, dist) =>
         val deg = new NoGapFill(new DefaultFeatureCollection(sftName, sft), 0, 0).metersToDegrees(110.57*1000, geoFac.createPoint(new Coordinate(0, lat)))
         (1.0-dist) should beLessThan(.0001)
       }
@@ -305,7 +306,7 @@ class TubeSelectProcessTest extends Specification {
   "TubeSelect" should {
     "properly handle values for execute" in {
       val sftName = "tubeline"
-      val sft = DataUtilities.createType(sftName, s"type:String,$geotimeAttributes")
+      val sft = SimpleFeatureTypes.createType(sftName, s"type:String,$geotimeAttributes")
       val ts = new TubeSelectProcess
       val ds = createStore
 
@@ -315,7 +316,7 @@ class TubeSelectProcessTest extends Specification {
       val res = fs.getFeatures(q)
 
       // tube features
-      val aLine = SimpleFeatureBuilder.build(sft, List(), "a-line")
+      val aLine = AvroSimpleFeatureFactory.buildAvroFeature(sft, List(), "a-line")
       aLine.setDefaultGeometry(WKTUtils.read("LINESTRING(40 40, 40 50)"))
       aLine.setAttribute(geomesa.core.process.tube.DEFAULT_DTG_FIELD, new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)
 //      aLine.setAttribute("end", new DateTime("2011-01-01T00:00:00Z", DateTimeZone.UTC).toDate)

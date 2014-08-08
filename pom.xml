@@ -28,19 +28,21 @@
         <module>geomesa-core</module>
         <module>geomesa-distributed-runtime</module>
         <module>geomesa-plugin</module>
-        <module>geomesa-dist</module>
         <module>geomesa-filter</module>
+        <module>geomesa-feature</module>
+        <module>geomesa-tools</module>
+        <module>geomesa-compute</module>
     </modules>
 
     <properties>
-        <scala.version>2.10.3</scala.version>
+        <scala.version>2.10.4</scala.version>
         <geoserver.version>2.5</geoserver.version>
-        <gt.version>11.0</gt.version>
+        <gt.version>11.2</gt.version>
         <jts.version>1.13</jts.version>
-        <ehcache.version>2.6.2</ehcache.version>
+        <scopt.version>3.2.0</scopt.version>
 
         <!-- environment-dependent versions -->
-        <zookeeper.version>3.3.6</zookeeper.version>
+        <zookeeper.version>3.4.5</zookeeper.version>
         <accumulo.version>1.5.1</accumulo.version>
         <hadoop.version>2.2.0</hadoop.version>
 
@@ -59,7 +61,7 @@
         <dist.dev>dev</dist.dev>
 
         <!-- testing properties -->
-        <maven.test.jvmargs>-Xms1g -Xmx2g -XX:MaxPermSize=512m -XX:-UseGCOverheadLimit</maven.test.jvmargs>
+        <maven.test.jvmargs>-Xms1g -Xmx2g -XX:MaxPermSize=1024m -XX:-UseGCOverheadLimit</maven.test.jvmargs>
         <fork.mode>once</fork.mode>
         <avro.version>1.7.5</avro.version>
     </properties>
@@ -68,10 +70,18 @@
         <profile>
             <id>debug-tests</id>
             <properties>
-                <maven.test.jvmargs>-Xms1g -Xmx2g -XX:MaxPermSize=512m -XX:-UseGCOverheadLimit -Xrunjdwp:transport=dt_socket,address=5000,server=y,suspend=y</maven.test.jvmargs>
+                <maven.test.jvmargs>-Xms1g -Xmx2g -XX:MaxPermSize=1024m -XX:-UseGCOverheadLimit -Xrunjdwp:transport=dt_socket,address=5000,server=y,suspend=y</maven.test.jvmargs>
             </properties>
         </profile>
     </profiles>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>repo.locationtech.org</id>
+            <name>GeoMesa Repository - Snapshots</name>
+            <url>https://repo.locationtech.org/content/repositories/geomesa-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <dependencyManagement>
         <dependencies>
@@ -98,17 +108,22 @@
             <dependency>
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
-                <version>2.1</version>
+                <version>2.3</version>
             </dependency>
             <dependency>
                 <groupId>org.joda</groupId>
                 <artifactId>joda-convert</artifactId>
-                <version>1.2</version>
+                <version>1.6</version>
             </dependency>
             <dependency>
                 <groupId>com.vividsolutions</groupId>
                 <artifactId>jts</artifactId>
                 <version>${jts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.spatial4j</groupId>
+                <artifactId>spatial4j</artifactId>
+                <version>0.4.1</version>
             </dependency>
             <dependency>
                 <groupId>org.geotools</groupId>
@@ -206,19 +221,9 @@
                 <version>2.10.0</version>
             </dependency>
             <dependency>
-                <groupId>net.sf.ehcache</groupId>
-                <artifactId>ehcache-core</artifactId>
-                <version>${ehcache.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.codehaus.jackson</groupId>
                 <artifactId>jackson-mapper-asl</artifactId>
                 <version>1.9.3</version>
-            </dependency>
-            <dependency>
-                <groupId>javax.transaction</groupId>
-                <artifactId>jta</artifactId>
-                <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -256,6 +261,12 @@
                 <classifier>geoserver-plugin</classifier>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>geomesa</groupId>
+                <artifactId>geomesa-feature-accumulo1.5</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
 
             <!-- logging -->
             <dependency>
@@ -423,6 +434,12 @@
                 <version>${gt.version}</version>
                 <scope>provided</scope>
             </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>11.0.2</version>
+                <scope>provided</scope>
+            </dependency>
             <!-- needed to make everything compile because accumulo & hadoop have
                  source level references to log4j classes which scala compiler needs -->
             <dependency>
@@ -436,7 +453,7 @@
             <dependency>
                 <groupId>org.specs2</groupId>
                 <artifactId>specs2_2.10</artifactId>
-                <version>1.12.3</version>
+                <version>2.3.13</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -446,16 +463,20 @@
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>11.0.1</version>
-                <scope>provided</scope>
+              <groupId>org.apache.accumulo</groupId>
+              <artifactId>accumulo-test</artifactId>
+              <version>${accumulo.version}</version>
+              <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>com.google.code.findbugs</groupId>
-                <artifactId>findbugs</artifactId>
-                <version>2.0.3</version>
-                <scope>provided</scope>
+                <groupId>org.geotools</groupId>
+                <artifactId>gt-geometry</artifactId>
+                <version>${gt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-core_2.10</artifactId>
+                <version>1.0.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -469,7 +490,6 @@
     </dependencies>
 
     <build>
-
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -522,13 +542,14 @@
                         </goals>
                     </execution>
                 </executions>
-
                 <configuration>
                     <jvmArgs>
-                        <jvmArg>-Xms64m</jvmArg>
-                        <jvmArg>-Xmx1024m</jvmArg>
+                        <jvmArg>-Xms1024m</jvmArg>
+                        <jvmArg>-Xmx4096m</jvmArg>
+                        <jvmArg>-XX:MaxPermSize=1024m</jvmArg>
                     </jvmArgs>
                     <args>
+                        <arg>-nowarn</arg>
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
                     </args>

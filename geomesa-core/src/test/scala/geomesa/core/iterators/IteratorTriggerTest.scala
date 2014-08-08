@@ -16,14 +16,14 @@
 
 package geomesa.core.iterators
 
-import collection.JavaConversions._
 import geomesa.core.data._
 import geomesa.core.index.QueryHints._
 import geomesa.core.index._
+import geomesa.utils.geotools.SimpleFeatureTypes
 import org.apache.accumulo.core.client.mock.MockInstance
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.geotools.data.simple.SimpleFeatureStore
-import org.geotools.data.{Query, DataUtilities}
+import org.geotools.data.{DataUtilities, Query}
 import org.geotools.factory.CommonFactoryFinder
 import org.geotools.filter.text.ecql.ECQL
 import org.geotools.geometry.jts.ReferencedEnvelope
@@ -31,6 +31,8 @@ import org.junit.runner.RunWith
 import org.opengis.feature.simple.SimpleFeatureType
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
+
+import scala.collection.JavaConversions._
 
 @RunWith(classOf[JUnitRunner])
 class IteratorTriggerTest extends Specification {
@@ -46,8 +48,8 @@ class IteratorTriggerTest extends Specification {
     }
 
     def testFeatureType: SimpleFeatureType = {
-      val featureType: SimpleFeatureType = DataUtilities.createType(featureName, testFeatureTypeSpec)
-      featureType.getUserData.put(SF_PROPERTY_START_TIME, "geomesa_index_start_time")
+      val featureType: SimpleFeatureType = SimpleFeatureTypes.createType(featureName, testFeatureTypeSpec)
+      featureType.getUserData.put(SF_PROPERTY_START_TIME, "dtg")
       featureType
     }
 
@@ -66,7 +68,7 @@ class IteratorTriggerTest extends Specification {
 
       val dsf = new AccumuloDataStoreFactory
 
-      import AccumuloDataStoreFactory.params._
+      import geomesa.core.data.AccumuloDataStoreFactory.params._
 
       val ds = dsf.createDataStore(
         Map(
@@ -82,12 +84,7 @@ class IteratorTriggerTest extends Specification {
         ))
 
       ds.createSchema(testFeatureType)
-      val fs = ds.getFeatureSource(featureName).asInstanceOf[SimpleFeatureStore]
-      //val dataFeatures = convertToSimpleFeatures(entries)
-      //val featureCollection = DataUtilities.collection(dataFeatures)
-      //fs.addFeatures(featureCollection)
-      //fs.getTransaction.commit()
-      fs
+      ds.getFeatureSource(featureName).asInstanceOf[SimpleFeatureStore]
     }
 
     /**
@@ -118,26 +115,26 @@ class IteratorTriggerTest extends Specification {
     val anotherTrivialFilterString = "(INCLUDE)"
 
     val extraAttributeFilterString =
-      "WITHIN(geomesa_index_geometry, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (attr2 like '2nd___')"
+      "WITHIN(geom, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (attr2 like '2nd___')"
 
     val nonReducibleFilterString =
-      "WITHIN(geomesa_index_geometry, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (geomesa_index_start_time before 2010-08-08T23:59:59Z) AND (geomesa_index_end_time after 2010-08-08T00:00:00Z)"
+      "WITHIN(geom, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (dtg before 2010-08-08T23:59:59Z) AND (dtg_end_time after 2010-08-08T00:00:00Z)"
 
     val reducibleFilterString =
-      "WITHIN(geomesa_index_geometry, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (geomesa_index_start_time between '2010-08-08T00:00:00.000Z' AND '2010-08-08T23:59:59.000Z')"
+      "WITHIN(geom, POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23))) AND (dtg between '2010-08-08T00:00:00.000Z' AND '2010-08-08T23:59:59.000Z')"
 
     // transforms for testing
     val simpleTransformToIndex = {
-      Array("geomesa_index_geometry", "geomesa_index_start_time")
+      Array("geom", "dtg")
     }
     val renameTransformToIndex = {
-      Array("newgeo=geomesa_index_geometry", "geomesa_index_start_time")
+      Array("newgeo=geom", "dtg")
     }
     val complexTransformToIndex = {
-      Array("geomesa_index_geometry=buffer(geomesa_index_geometry,2)", "geomesa_index_start_time")
+      Array("geom=buffer(geom,2)", "dtg")
     }
     val simpleTransformToIndexPlusAnother = {
-      Array("geomesa_index_geometry", "geomesa_index_start_time", "attr2")
+      Array("geom", "dtg", "attr2")
     }
     val nullTransform = null
 

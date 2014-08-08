@@ -1,7 +1,9 @@
 package geomesa.core.data
 
-import collection.JavaConversions._
+import geomesa.core.index.SF_PROPERTY_START_TIME
+import geomesa.feature.AvroSimpleFeatureFactory
 import geomesa.utils.geotools.Conversions._
+import geomesa.utils.geotools.SimpleFeatureTypes
 import geomesa.utils.text.WKTUtils
 import org.apache.accumulo.core.client.BatchWriterConfig
 import org.apache.accumulo.core.client.mock.MockInstance
@@ -10,20 +12,22 @@ import org.apache.accumulo.core.data.Mutation
 import org.apache.accumulo.core.security.Authorizations
 import org.apache.commons.codec.binary.Hex
 import org.geotools.data.collection.ListFeatureCollection
-import org.geotools.data.{Query, DataUtilities, DataStoreFinder}
+import org.geotools.data.{DataStoreFinder, DataUtilities, Query}
 import org.geotools.factory.Hints
-import org.geotools.feature.simple.SimpleFeatureBuilder
 import org.junit.runner.RunWith
+import org.opengis.feature.simple.SimpleFeature
 import org.opengis.filter.Filter
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 
+import scala.collection.JavaConversions._
+
 
 /**
- * The purpose of this test is to ensure that the table version is backwards compatible with
- * older versions (e.g. 0.10.x). The table format should not be changed without some sort of
- * transition map/reduce job to convert table formats.
- */
+* The purpose of this test is to ensure that the table version is backwards compatible with
+* older versions (e.g. 0.10.x). The table format should not be changed without some sort of
+* transition map/reduce job to convert table formats.
+*/
 @RunWith(classOf[JUnitRunner])
 class TableVersionTest extends Specification {
 
@@ -43,7 +47,8 @@ class TableVersionTest extends Specification {
   val manualParams = baseParams ++ Map("tableName" -> "manualTable")
 
   val sftName = "regressionTestType"
-  val sft = DataUtilities.createType(sftName, s"name:String,$geotimeAttributes")
+  val sft = SimpleFeatureTypes.createType(sftName, s"name:String,$geotimeAttributes")
+  sft.getUserData.put(SF_PROPERTY_START_TIME, "dtg")
 
   def buildManualTable(params: Map[String, String]) = {
     val instance = new MockInstance(params("instanceId"))
@@ -54,7 +59,7 @@ class TableVersionTest extends Specification {
 
     // Insert metadata
     val metadataMutation = new Mutation(s"~METADATA_$sftName")
-    metadataMutation.put("attributes", "", s"name:String,geomesa_index_geometry:Geometry:srid=4326,geomesa_index_start_time:Date,geomesa_index_end_time:Date")
+    metadataMutation.put("attributes", "", s"name:String,geom:Geometry:srid=4326,dtg:Date,dtg_end_time:Date")
     metadataMutation.put("bounds", "", "45.0:45.0:49.0:49.0")
     metadataMutation.put("schema", "", s"%~#s%99#r%$sftName#cstr%0,3#gh%yyyyMMdd#d::%~#s%3,2#gh::%~#s%#id")
     bw.addMutation(metadataMutation)
@@ -94,13 +99,13 @@ class TableVersionTest extends Specification {
     "000000013500000015000000000140468000000000004046800000000000000001349ccf6e18").map {v =>
     hex.decode(v.getBytes)}
 
-  val builder = new SimpleFeatureBuilder(sft)
+  val builder = AvroSimpleFeatureFactory.featureBuilder(sft)
 
   def getFeatures = (0 until 6).map { i =>
     builder.reset
-    builder.set("geomesa_index_geometry", WKTUtils.read("POINT(45.0 45.0)"))
-    builder.set("geomesa_index_start_time", "2012-01-02T05:06:07.000Z")
-    builder.set("geomesa_index_end_time", "2012-01-02T05:06:07.000Z")
+    builder.set("geom", WKTUtils.read("POINT(45.0 45.0)"))
+    builder.set("dtg", "2012-01-02T05:06:07.000Z")
+    builder.set("dtg_end_time", "2012-01-02T05:06:07.000Z")
     builder.set("name",i.toString)
     val sf = builder.buildFeature(i.toString)
     sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
@@ -126,13 +131,12 @@ class TableVersionTest extends Specification {
       val geomesaStore = DataStoreFinder.getDataStore(geomesaParams).asInstanceOf[AccumuloDataStore]
       val geomesaSource = geomesaStore.getFeatureSource(sftName).asInstanceOf[AccumuloFeatureStore]
 
-      val manualFeatures = manualSource.getFeatures(query).features
-      val geomesaFeatures = geomesaSource.getFeatures(query).features
+      val manualFeatures = manualSource.getFeatures(query).features.toList.sortBy(_.getID.toInt)
+      val geomesaFeatures = geomesaSource.getFeatures(query).features.toList.sortBy(_.getID.toInt)
 
-      manualFeatures.zip(geomesaFeatures).foreach {case (m, g) =>
-        m should equalTo(g)
-      }
+      manualFeatures must forall { m: SimpleFeature => (m must not).beNull }
 
+      manualFeatures must containTheSameElementsAs(geomesaFeatures)
     }
 
     "revert to text even when told to use avro if the table isn't avro" in {
@@ -143,7 +147,7 @@ class TableVersionTest extends Specification {
       val manualStore = DataStoreFinder.getDataStore(badParams).asInstanceOf[AccumuloDataStore]
 
       // the user provided avro
-      manualStore.featureEncoding should equalTo(FeatureEncoding.AVRO)
+      manualStore.featureEncoding mustEqual FeatureEncoding.AVRO
 
       // Ensure that a table with featureEncoder metadata defaults to TextFeatureEncoder
       // and verify with a manual scanner
@@ -156,7 +160,7 @@ class TableVersionTest extends Specification {
         if (entry.getKey.getColumnFamily == FEATURE_ENCODING_CF)
           entry.getValue.toString mustEqual FeatureEncoding.TEXT.toString
       }
-      scanner.close
+      scanner.close()
 
       // Here we are creating a schema AFTER a table already exists...this mimics upgrading
       // from 0.10.x to 1.0.0 ...this call to createSchema should insert a row into the table
@@ -171,7 +175,7 @@ class TableVersionTest extends Specification {
       scanner2.iterator.foreach { entry =>
         hasEncodingMeta |= entry.getKey.getColumnFamily.equals(FEATURE_ENCODING_CF)
       }
-      hasEncodingMeta should equalTo(true)
+      hasEncodingMeta must beTrue
 
       // compare again to ensure we get the same implementation type (aka SimpleFeatureImpl for text)
       val manualSource = manualStore.getFeatureSource(sftName).asInstanceOf[AccumuloFeatureStore]
@@ -183,12 +187,10 @@ class TableVersionTest extends Specification {
       val manualFeatures = manualSource.getFeatures(query).features
       val geomesaFeatures = geomesaSource.getFeatures(query).features
 
-      manualFeatures.size should equalTo(6)
-      geomesaFeatures.size should equalTo(6)
+      manualFeatures.size mustEqual 6
+      geomesaFeatures.size mustEqual 6
 
-      manualFeatures.zip(geomesaFeatures).foreach {case (m, g) =>
-        m should equalTo(g)
-      }
+      manualFeatures.toList must containTheSameElementsAs(geomesaFeatures.toList)
     }
 
     "properly encode text after having data written with 1.0.0 api" in {
@@ -202,7 +204,7 @@ class TableVersionTest extends Specification {
       val manualStore = DataStoreFinder.getDataStore(newManualParams).asInstanceOf[AccumuloDataStore]
 
       // the user provided avro
-      manualStore.featureEncoding should equalTo(FeatureEncoding.AVRO)
+      manualStore.featureEncoding mustEqual FeatureEncoding.AVRO
 
       // Ensure that a table with featureEncoder metadata defaults to TextFeatureEncoder
       // and verify with a manual scanner
@@ -217,9 +219,9 @@ class TableVersionTest extends Specification {
       scanner.close
 
       builder.reset
-      builder.set("geomesa_index_geometry", WKTUtils.read("POINT(45.0 45.0)"))
-      builder.set("geomesa_index_start_time", "2012-01-02T05:06:07.000Z")
-      builder.set("geomesa_index_end_time", "2012-01-02T05:06:07.000Z")
+      builder.set("geom", WKTUtils.read("POINT(45.0 45.0)"))
+      builder.set("dtg", "2012-01-02T05:06:07.000Z")
+      builder.set("dtg_end_time", "2012-01-02T05:06:07.000Z")
       builder.set("name","random")
       val sf = builder.buildFeature("bigid")
       sf.getUserData()(Hints.USE_PROVIDED_FID) = java.lang.Boolean.TRUE
@@ -238,11 +240,11 @@ class TableVersionTest extends Specification {
       val manualFeatures = manualSource.getFeatures(query).features
       val geomesaFeatures = geomesaSource.getFeatures(query).features
 
-      manualFeatures.size should equalTo(7)
-      geomesaFeatures.size should equalTo(7)
+      manualFeatures.size mustEqual 7
+      geomesaFeatures.size mustEqual 7
 
       manualFeatures.zip(geomesaFeatures).foreach {case (m, g) =>
-        m should equalTo(g)
+        m mustEqual g
       }
 
       manualStore.getFeatureEncoder(sftName) should beAnInstanceOf[TextFeatureEncoder]
@@ -256,14 +258,14 @@ class TableVersionTest extends Specification {
       }
 
       // the store will validate and update itself upon operation
-      hasEncodingMeta should equalTo(true)
+      hasEncodingMeta must beTrue
     }
 
     "should default to creating new tables in avro" in {
       var newGeomesaParams = geomesaParams.updated("tableName", "geomesa3")
       newGeomesaParams -= "featureEncoding"
 
-      newGeomesaParams.contains("featureEncoding") should be equalTo(false)
+      newGeomesaParams.contains("featureEncoding") must beFalse
 
       buildTableWithDataStore(newGeomesaParams)
 
