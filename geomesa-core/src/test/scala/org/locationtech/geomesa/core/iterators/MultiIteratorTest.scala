@@ -251,6 +251,31 @@ class MultiIteratorTest extends Specification with Logging {
       indexOnlyCount mustEqual filteredCount
       stQueriedCount mustEqual filteredCount
     }
+    /**
+    "return a filtered results-set with a meaningful ID Filter" in {
+      //val filterString = "IN ('|data|12') AND INTERSECTS(geom,POLYGON ((45 23, 48 23, 48 27, 45 27, 45 23)))"
+      val filterString = "INTERSECTS(geom, POLYGON ((45 23, 51 23, 51 31, 45 31, 45 23)))"
+      //val filterString = "IN ('|data|12')"
+      val fs = IteratorTest.setupMockFeatureSource(TestData.fullData, "mock_full_id_and_geo")
+      val features = TestData.fullData.map(createSF)
+      val q = getQuery(Some(filterString))
+      //val q = new Query(TestData.featureType.getTypeName, ECQL.toFilter(filterString))
+      val indexOnlyQuery = getQuery(Some(filterString), indexIterator = true)
+
+      val filteredCount = features.count(q.getFilter.evaluate)
+      val stQueriedCount = fs.getFeatures(q).size
+      //val aQuery = getQuery(None, indexIterator = true)
+      val aFeature = fs.getFeatures(q).features.next()
+
+      val indexOnlyCount = fs.getFeatures(indexOnlyQuery).size
+      //logger.debug(s"Filter: ${q.getFilter} queryCount: $stQueriedCount filteredCount: $filteredCount ")
+      logger.debug(s"Filter: ${q.getFilter} queryCount: $stQueriedCount filteredCount: $filteredCount indexOnlyCount: $indexOnlyCount")
+
+      // validate the total number of query-hits
+      indexOnlyCount mustEqual filteredCount
+      stQueriedCount mustEqual filteredCount
+    }//.pendingUntilFixed
+    **/
 
     "return a filtered results-set with a degenerate time-range" in {
       val filterString = "true = true"

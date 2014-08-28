@@ -26,6 +26,7 @@ import org.specs2.specification.Fragments
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
+import org.locationtech.geomesa.utils.geotools.Conversions.{RichSimpleFeature, toRichSimpleFeatureIterator}
 
 @RunWith(classOf[JUnitRunner])
 class AllPredicateTest extends Specification with FilterTester {
@@ -70,6 +71,13 @@ class AttributeGeoPredicateTest extends FilterTester {
 }
 
 @RunWith(classOf[JUnitRunner])
+class IdPredicateTest extends FilterTester {
+  val filters = idPredicates
+  runTest
+}
+
+
+@RunWith(classOf[JUnitRunner])
 class IdQueryTest extends Specification {
 
   val ff = CommonFactoryFinder.getFilterFactory2
@@ -111,8 +119,9 @@ class IdQueryTest extends Specification {
   "Id queries" should {
 
     "use record table to return a result" >> {
-      val idQ = ff.id(ff.featureId("2"))
+      val idQ = ff.id(ff.featureId("2")).asInstanceOf[Id]
       val res = fs.getFeatures(idQ).features().toList
+      //val test = mediumDataFeatures.count(filter.evaluate)
       res.length mustEqual 1
       res.head.getID mustEqual "2"
     }
@@ -182,7 +191,7 @@ trait FilterTester extends Specification with Logging {
       "return the same number of results from filtering and querying" in {
         val filterCount = mediumDataFeatures.count(filter.evaluate)
         val queryCount = fs.getFeatures(filter).size
-        
+
         logger.debug(s"\nFilter: ${ECQL.toCQL(filter)}\nFullData size: ${mediumDataFeatures.size}: " +
           s"filter hits: $filterCount query hits: $queryCount")
         filterCount mustEqual queryCount

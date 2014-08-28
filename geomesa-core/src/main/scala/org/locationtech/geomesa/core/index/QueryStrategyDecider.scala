@@ -17,6 +17,7 @@
 package org.locationtech.geomesa.core.index
 
 import org.geotools.data.Query
+import org.geotools.feature.simple.SimpleFeatureImpl
 import org.locationtech.geomesa.core.index.AttributeIdxEqualsStrategy
 import org.locationtech.geomesa.core.index.QueryHints._
 import org.opengis.feature.simple.SimpleFeatureType
@@ -63,12 +64,23 @@ object QueryStrategyDecider {
   }
 
   private def processAnd(isDensity: Boolean, sft: SimpleFeatureType, and: And): Strategy = {
+    /**
+    val allChildren = and.getChildren.map(c => chooseNewStrategy(isDensity, sft, c))
+    val stratgies = List [RecordIdxStrategy, AttributeIdxStrategy]
+    allChildren match {
+      case
+    }
+    **/
+
     if (and.getChildren.forall(c => chooseNewStrategy(isDensity, sft, c).isInstanceOf[AttributeIdxStrategy])) {
       //311 - return AttributeStrategy using first attr as index and containing simple feature filtering iterator to filter out remaining attrs
       new STIdxStrategy
     } else {
-      //other cases - flesh out, there may be record id lookup + attr
-      new STIdxStrategy
+      // if a ID predicate is present,
+      if (and.getChildren.exists(c => chooseNewStrategy(isDensity, sft, c).isInstanceOf[RecordIdxStrategy])) {
+        new RecordIdxStrategy
+      }
+      else new STIdxStrategy
     }
   }
 

@@ -28,7 +28,6 @@ import org.geotools.data.Query
 import org.geotools.filter.text.ecql.ECQL
 import org.joda.time.Interval
 import org.locationtech.geomesa.core.data.{SimpleFeatureEncoder, AccumuloConnectorCreator}
-import org.locationtech.geomesa.core.DEFAULT_SCHEMA_NAME
 import org.locationtech.geomesa.core.GEOMESA_ITERATORS_IS_DENSITY_TYPE
 import org.locationtech.geomesa.core.iterators._
 import org.locationtech.geomesa.core.filter._
@@ -148,42 +147,6 @@ class STIdxStrategy extends Strategy with Logging {
     }
   }
 
-  def getSFFIIterCfg(iteratorConfig: IteratorConfig,
-                     featureType: SimpleFeatureType,
-                     ecql: Option[String],
-                     schema: String,
-                     featureEncoder: SimpleFeatureEncoder,
-                     query: Query): Option[IteratorSetting] = {
-    if (iteratorConfig.useSFFI) {
-      Some(configureSimpleFeatureFilteringIterator(featureType, ecql, schema, featureEncoder, query))
-    } else None
-  }
-
-  def getTopIterCfg(query: Query,
-                    geometryToCover: Geometry,
-                    schema: String,
-                    featureEncoder: SimpleFeatureEncoder,
-                    featureType: SimpleFeatureType) = {
-    if (query.getHints.containsKey(DENSITY_KEY)) {
-      val clazz = classOf[DensityIterator]
-
-      val cfg = new IteratorSetting(iteratorPriority_AnalysisIterator,
-        "topfilter-" + randomPrintableString(5),
-        clazz)
-
-      val width = query.getHints.get(WIDTH_KEY).asInstanceOf[Int]
-      val height = query.getHints.get(HEIGHT_KEY).asInstanceOf[Int]
-      val polygon = if (geometryToCover == null) null else geometryToCover.getEnvelope.asInstanceOf[Polygon]
-
-      DensityIterator.configure(cfg, polygon, width, height)
-
-      cfg.addOption(DEFAULT_SCHEMA_NAME, schema)
-      configureFeatureEncoding(cfg, featureEncoder)
-      configureFeatureType(cfg, featureType)
-
-      Some(cfg)
-    } else None
-  }
 
   // establishes the regular expression that defines (minimally) acceptable rows
   def configureRowRegexIterator(regex: String): IteratorSetting = {
