@@ -34,6 +34,13 @@ class SimpleFeatureTypesTest extends Specification {
       (sft.getGeometryDescriptor.getCoordinateReferenceSystem must not).beNull
     }
 
+    "handle Int vs. Integer lexicographical ordering" >> {
+      val sft1 = SimpleFeatureTypes.createType("testing1", "foo:Int,*geom:Point:index=true")
+      val sft2 = SimpleFeatureTypes.createType("testing2", "foo:Integer,*geom:Point:index=true")
+      sft1.getAttributeCount must beEqualTo(2)
+      sft2.getAttributeCount must beEqualTo(2)
+    }
+
     "handle no index attribute" >> {
       val sft = SimpleFeatureTypes.createType("testing", "id:Integer,*geom:Point:index=true")
       sft.getDescriptor("id").getUserData.containsKey("index") must beTrue
@@ -55,7 +62,93 @@ class SimpleFeatureTypesTest extends Specification {
       val indexed = SimpleFeatureTypes.getIndexedAttributes(sft)
       indexed.map(_.getLocalName) must containTheSameElementsAs(List("dtg", "geom"))
     }
-  }
 
+    "set index=true for a default geometry" >> {
+      val sft = SimpleFeatureTypes.createType("testing", "id:Integer:index=false,dtg:Date:index=true,*geom:Point:srid=4326:index=false")
+      val indexed = SimpleFeatureTypes.getIndexedAttributes(sft).map(_.getLocalName)
+      indexed must contain("geom")
+    }
+
+    "handle list types" >> {
+
+      "with no values specified" >> {
+        val sft = SimpleFeatureTypes.createType("testing", "id:Integer,names:List,dtg:Date,*geom:Point:srid=4326")
+        sft.getAttributeCount mustEqual(4)
+        sft.getDescriptor("names") must not beNull
+
+        sft.getDescriptor("names").getType.getBinding mustEqual(classOf[java.util.List[_]])
+
+        val spec = SimpleFeatureTypes.encodeType(sft)
+        spec mustEqual "id:Integer:index=false,names:List[String]:index=false,dtg:Date:index=false,*geom:Point:srid=4326:index=true"
+      }
+
+      "with defined values" >> {
+        val sft = SimpleFeatureTypes.createType("testing", "id:Integer,names:List[Double],dtg:Date,*geom:Point:srid=4326")
+        sft.getAttributeCount mustEqual(4)
+        sft.getDescriptor("names") must not beNull
+
+        sft.getDescriptor("names").getType.getBinding mustEqual(classOf[java.util.List[_]])
+
+        val spec = SimpleFeatureTypes.encodeType(sft)
+        spec mustEqual "id:Integer:index=false,names:List[Double]:index=false,dtg:Date:index=false,*geom:Point:srid=4326:index=true"
+      }
+
+      "fail for illegal value format" >> {
+        val spec = "id:Integer,names:List[Double][Double],dtg:Date,*geom:Point:srid=4326"
+        SimpleFeatureTypes.createType("testing", spec) should throwAn[IllegalArgumentException]
+      }
+
+      "fail for illegal value classes" >> {
+        val spec = "id:Integer,names:List[FAKE],dtg:Date,*geom:Point:srid=4326"
+        SimpleFeatureTypes.createType("testing", spec) should throwAn[IllegalArgumentException]
+      }
+    }
+
+    "handle map types" >> {
+
+      "with no values specified" >> {
+        val sft = SimpleFeatureTypes.createType("testing", "id:Integer,metadata:Map,dtg:Date,*geom:Point:srid=4326")
+        sft.getAttributeCount mustEqual(4)
+        sft.getDescriptor("metadata") must not beNull
+
+        sft.getDescriptor("metadata").getType.getBinding mustEqual classOf[java.util.Map[_, _]]
+
+        val spec = SimpleFeatureTypes.encodeType(sft)
+        spec mustEqual "id:Integer:index=false,metadata:Map[String,String]:index=false,dtg:Date:index=false,*geom:Point:srid=4326:index=true"
+      }
+
+      "with defined values" >> {
+        val sft = SimpleFeatureTypes.createType("testing", "id:Integer,metadata:Map[Double,String],dtg:Date,*geom:Point:srid=4326")
+        sft.getAttributeCount mustEqual(4)
+        sft.getDescriptor("metadata") must not beNull
+
+        sft.getDescriptor("metadata").getType.getBinding mustEqual classOf[java.util.Map[_, _]]
+
+        val spec = SimpleFeatureTypes.encodeType(sft)
+        spec mustEqual "id:Integer:index=false,metadata:Map[Double,String]:index=false,dtg:Date:index=false,*geom:Point:srid=4326:index=true"
+      }
+
+      "fail for illegal value format" >> {
+        val spec = "id:Integer,metadata:Map[String],dtg:Date,*geom:Point:srid=4326"
+        SimpleFeatureTypes.createType("testing", spec) should throwAn[IllegalArgumentException]
+      }
+
+      "fail for illegal value classes" >> {
+        val spec = "id:Integer,metadata:Map[String,FAKE],dtg:Date,*geom:Point:srid=4326"
+        SimpleFeatureTypes.createType("testing", spec) should throwAn[IllegalArgumentException]
+      }
+    }
+
+    "handle splitter and splitter options" >> {
+      val spec = "name:String,dtg:Date,*geom:Point:srid=4326;table.splitter.class=org.locationtech.geomesa.core.data.DigitSplitter,table.splitter.options=fmt:%02d,min:0,max:99"
+      val sft = SimpleFeatureTypes.createType("test", spec)
+      sft.getUserData.get(SimpleFeatureTypes.TABLE_SPLITTER) must be equalTo "org.locationtech.geomesa.core.data.DigitSplitter"
+      val opts = sft.getUserData.get(SimpleFeatureTypes.TABLE_SPLITTER_OPTIONS).asInstanceOf[Map[String, String]]
+      opts.size must be equalTo 3
+      opts("fmt") must be equalTo "%02d"
+      opts("min") must be equalTo "0"
+      opts("max") must be equalTo "99"
+    }
+  }
 
 }

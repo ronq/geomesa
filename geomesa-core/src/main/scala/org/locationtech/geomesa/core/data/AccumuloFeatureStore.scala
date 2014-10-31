@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Commonwealth Computer Research, Inc.
+ * Copyright 2014 Commonwealth Computer Research, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,11 +59,13 @@ object AccumuloFeatureStore {
           val origAttr = origSFT.getDescriptor(p.getPropertyName)
           val ab = new AttributeTypeBuilder()
           ab.init(origAttr)
-          if(origAttr.isInstanceOf[GeometryDescriptor]) {
+          val descriptor = if (origAttr.isInstanceOf[GeometryDescriptor]) {
             ab.buildDescriptor(name, ab.buildGeometryType())
           } else {
             ab.buildDescriptor(name, ab.buildType())
           }
+          descriptor.getUserData.putAll(origAttr.getUserData)
+          descriptor
 
         case f: FunctionExpressionImpl  =>
           val clazz = f.getFunctionName.getReturn.getType

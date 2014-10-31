@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2014 Commonwealth Computer Research, Inc.
+ * Copyright 2014-2014 Commonwealth Computer Research, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +33,15 @@ import org.locationtech.geomesa.core.util.CloseableIterator._
 import org.locationtech.geomesa.core.util.{CloseableIterator, SelfClosingIterator}
 import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
+import org.opengis.filter.sort.{SortBy, SortOrder}
+
+import scala.reflect.ClassTag
 
 object QueryPlanner {
   val iteratorPriority_RowRegex                        = 0
   val iteratorPriority_AttributeIndexFilteringIterator = 10
   val iteratorPriority_AttributeIndexIterator          = 200
+  val iteratorPriority_AttributeUniqueIterator         = 300
   val iteratorPriority_ColFRegex                       = 100
   val iteratorPriority_SpatioTemporalIterator          = 200
   val iteratorPriority_SimpleFeatureFilteringIterator  = 300
@@ -82,26 +86,47 @@ case class QueryPlanner(schema: String,
                   sft: SimpleFeatureType,
                   query: Query,
                   output: ExplainerOutputType = log): CloseableIterator[Entry[Key,Value]] = {
+
+    output(s"Running ${ExplainerOutputType.toString(query)}")
     val ff = CommonFactoryFinder.getFilterFactory2
     val isDensity = query.getHints.containsKey(BBOX_KEY)
-    val queries: Iterator[Query] =
-      if(isDensity) {
-        val env = query.getHints.get(BBOX_KEY).asInstanceOf[ReferencedEnvelope]
-        val q1 = new Query(featureType.getTypeName, ff.bbox(ff.property(featureType.getGeometryDescriptor.getLocalName), env))
-        Iterator(DataUtilities.mixQueries(q1, query, "geomesa.mixed.query"))
-      } else {
-        splitQueryOnOrs(query, output)
-      }
+    val duplicatableData = IndexSchema.mayContainDuplicates(featureType)
 
-    queries.ciFlatMap(configureScanners(acc, sft, _, isDensity, output))
+    def flatten(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] =
+      queries.toIterator.ciFlatMap(configureScanners(acc, sft, _, isDensity, output))
+
+    // in some cases, where duplicates may appear in overlapping queries or the data itself, remove them
+    def deduplicate(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] = {
+      val flatQueries = flatten(queries)
+      val decoder = SimpleFeatureDecoder(getReturnSFT(query), featureEncoding)
+      new DeDuplicatingIterator(flatQueries, (key: Key, value: Value) => decoder.extractFeatureId(value))
+    }
+
+    if(isDensity) {
+      val env = query.getHints.get(BBOX_KEY).asInstanceOf[ReferencedEnvelope]
+      val q1 = new Query(featureType.getTypeName, ff.bbox(ff.property(featureType.getGeometryDescriptor.getLocalName), env))
+      val mixedQuery = DataUtilities.mixQueries(q1, query, "geomesa.mixed.query")
+      if (duplicatableData) {
+        deduplicate(Seq(mixedQuery))
+      } else {
+        flatten(Seq(mixedQuery))
+      }
+    } else {
+      val rawQueries = splitQueryOnOrs(query, output)
+      if (rawQueries.length > 1 || duplicatableData) {
+        deduplicate(rawQueries)
+      } else {
+        flatten(rawQueries)
+      }
+    }
   }
   
-  def splitQueryOnOrs(query: Query, output: ExplainerOutputType): Iterator[Query] = {
+  def splitQueryOnOrs(query: Query, output: ExplainerOutputType): Seq[Query] = {
     val originalFilter = query.getFilter
-    output(s"Originalfilter is $originalFilter")
+    output(s"Original filter: $originalFilter")
 
     val rewrittenFilter = rewriteFilter(originalFilter)
-    output(s"Filter is rewritten as $rewrittenFilter")
+    output(s"Rewritten filter: $rewrittenFilter")
 
     val orSplitter = new OrSplittingFilter
     val splitFilters = orSplitter.visit(rewrittenFilter, null)
@@ -113,7 +138,7 @@ case class QueryPlanner(schema: String,
       val q = new Query(query)
       q.setFilter(filter)
       q
-    }.toIterator
+    }
   }
 
   /**
@@ -130,16 +155,15 @@ case class QueryPlanner(schema: String,
                        derivedQuery: Query,
                        isDensity: Boolean,
                        output: ExplainerOutputType): SelfClosingIterator[Entry[Key, Value]] = {
+    output(s"Transforms: ${derivedQuery.getHints.get(TRANSFORMS)}")
     val strategy = QueryStrategyDecider.chooseStrategy(acc.catalogTableFormat(sft), sft, derivedQuery)
 
-    output(s"Strategy: $strategy")
+    output(s"Strategy: ${strategy.getClass.getCanonicalName}")
     strategy.execute(acc, this, sft, derivedQuery, output)
   }
 
   def query(query: Query, acc: AccumuloConnectorCreator): CloseableIterator[SimpleFeature] = {
     // Perform the query
-    logger.trace(s"Running ${query.toString}")
-
     val accumuloIterator = getIterator(acc, featureType, query)
 
     // Convert Accumulo results to SimpleFeatures
@@ -152,22 +176,43 @@ case class QueryPlanner(schema: String,
     val returnSFT = getReturnSFT(query)
     val decoder = SimpleFeatureDecoder(returnSFT, featureEncoding)
 
-    // the final iterator may need duplicates removed
-    val uniqKVIter: CloseableIterator[Entry[Key,Value]] =
-      if (IndexSchema.mayContainDuplicates(featureType))
-        new DeDuplicatingIterator(accumuloIterator, (key: Key, value: Value) => decoder.extractFeatureId(value))
-      else accumuloIterator
-
     // Decode according to the SFT return type.
     // if this is a density query, expand the map
     if (query.getHints.containsKey(DENSITY_KEY)) {
-      uniqKVIter.flatMap { kv: Entry[Key, Value] =>
+      accumuloIterator.flatMap { kv: Entry[Key, Value] =>
         DensityIterator.expandFeature(decoder.decode(kv.getValue))
       }
     } else {
-      uniqKVIter.map { kv => decoder.decode(kv.getValue) }
+      val features = accumuloIterator.map { kv => decoder.decode(kv.getValue) }
+      if(query.getSortBy != null && query.getSortBy.length > 0) sort(features, query.getSortBy)
+      else features
     }
   }
+
+  private def sort(features: CloseableIterator[SimpleFeature],
+                   sortBy: Array[SortBy]): CloseableIterator[SimpleFeature] = {
+    val sortOrdering = sortBy.map {
+      case SortBy.NATURAL_ORDER => Ordering.by[SimpleFeature, String](_.getID)
+      case SortBy.REVERSE_ORDER => Ordering.by[SimpleFeature, String](_.getID).reverse
+      case sb                   =>
+        val prop = sb.getPropertyName.getPropertyName
+        val ord  = attributeToComparable(prop)
+        if(sb.getSortOrder == SortOrder.DESCENDING) ord.reverse
+        else ord
+    }
+    val comp: (SimpleFeature, SimpleFeature) => Boolean =
+      if(sortOrdering.length == 1) {
+        // optimized case for one ordering
+        val ret = sortOrdering.head
+        (l, r) => ret.compare(l, r) < 0
+      }  else {
+        (l, r) => sortOrdering.map(_.compare(l, r)).find(_ != 0).getOrElse(0) < 0
+      }
+    CloseableIterator(features.toList.sortWith(comp).iterator)
+  }
+
+  def attributeToComparable[T <: Comparable[T]](prop: String)(implicit ct: ClassTag[T]): Ordering[SimpleFeature] =
+      Ordering.by[SimpleFeature, T](_.getAttribute(prop).asInstanceOf[T])
 
   // This function calculates the SimpleFeatureType of the returned SFs.
   private def getReturnSFT(query: Query): SimpleFeatureType =

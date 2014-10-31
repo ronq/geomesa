@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Commonwealth Computer Research, Inc.
+ * Copyright 2014 Commonwealth Computer Research, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.junit.runner.RunWith
 import org.locationtech.geomesa.core.data._
 import org.locationtech.geomesa.core.data.tables.AttributeTable
 import org.locationtech.geomesa.core.index
-import org.locationtech.geomesa.core.index.{AttributeIdxEqualsStrategy, STIdxStrategy, AttributeIdxLikeStrategy, QueryStrategyDecider}
+import org.locationtech.geomesa.core.index.{AttributeIdxEqualsStrategy, AttributeIdxLikeStrategy, QueryStrategyDecider, STIdxStrategy}
 import org.locationtech.geomesa.utils.geotools.Conversions._
 import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes
 import org.locationtech.geomesa.utils.text.WKTUtils
@@ -112,7 +112,8 @@ class AttributeIndexFilteringIteratorTest extends Specification {
       val scanner = conn.createScanner(table, new Authorizations())
       val is = new IteratorSetting(40, classOf[AttributeIndexFilteringIterator])
       scanner.addScanIterator(is)
-      scanner.setRange(new ARange(AttributeTable.getAttributeIndexRow("", "name", Some("b"))))
+      val range = AttributeTable.getAttributeIndexRows("", sft.getDescriptor("name"), Some("b")).head
+      scanner.setRange(new ARange(range))
       scanner.iterator.size mustEqual 4
     }
 

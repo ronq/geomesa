@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Commonwealth Computer Research, Inc.
+ * Copyright 2014 Commonwealth Computer Research, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.locationtech.geomesa.core.index
 
+import com.typesafe.scalalogging.slf4j.Logging
 import com.vividsolutions.jts.geom.{Geometry, GeometryCollection, Point, Polygon}
 import org.apache.accumulo.core.data.Key
 import org.geotools.data.Query
@@ -87,7 +88,7 @@ case class IndexSchema(encoder: IndexEntryEncoder,
   }
 }
 
-object IndexSchema extends RegexParsers {
+object IndexSchema extends RegexParsers with Logging {
   val minDateTime = new DateTime(0, 1, 1, 0, 0, 0, DateTimeZone.forID("UTC"))
   val maxDateTime = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeZone.forID("UTC"))
   val everywhen = new Interval(minDateTime, maxDateTime)
@@ -344,8 +345,13 @@ object IndexSchema extends RegexParsers {
   // only those geometries known to contain only point data can guarantee that
   // they do not contain duplicates
   def mayContainDuplicates(featureType: SimpleFeatureType): Boolean =
-    if (featureType == null) true
-    else featureType.getGeometryDescriptor.getType.getBinding != classOf[Point]
+    try {
+      featureType == null || featureType.getGeometryDescriptor.getType.getBinding != classOf[Point]
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Error comparing default geometry for feature type ${featureType.getName}")
+        true
+    }
 
   // builds a IndexSchema (requiring a feature type)
   def apply(s: String,

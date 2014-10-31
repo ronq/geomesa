@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2013 Commonwealth Computer Research, Inc.
+  ~ Copyright 2014 Commonwealth Computer Research, Inc.
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.locationtech.geomesa</groupId>
     <artifactId>geomesa-accumulo1.5</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0-rc.2-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>GeoMesa - [Accumulo 1.5.x]</name>
 
@@ -87,6 +87,11 @@
     </profiles>
 
     <distributionManagement>
+        <repository>
+            <id>repo.locationtech.org</id>
+            <name>GeoMesa Repository - Releases</name>
+            <url>https://repo.locationtech.org/content/repositories/geomesa-releases/</url>
+        </repository>
         <snapshotRepository>
             <id>repo.locationtech.org</id>
             <name>GeoMesa Repository - Snapshots</name>
@@ -258,18 +263,6 @@
                 <groupId>org.geotools</groupId>
                 <artifactId>gt-grid</artifactId>
                 <version>${gt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.geotools</groupId>
-                <artifactId>gt-epsg-hsql</artifactId>
-                <version>${gt.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <!-- excluded due to license issues -->
-                        <artifactId>jgridshift</artifactId>
-                        <groupId>jgridshift</groupId>
-                     </exclusion>
-                </exclusions>
             </dependency>
             <dependency>
                 <groupId>commons-pool</groupId>

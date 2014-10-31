@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Commonwealth Computer Research, Inc.
+ * Copyright 2014 Commonwealth Computer Research, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 
 package org.locationtech.geomesa.core
 
+import java.util.{List => JList}
+
 import com.typesafe.scalalogging.slf4j.Logging
-import org.apache.accumulo.core.data.{Key, Value}
+import org.apache.accumulo.core.data.{Key, Value, Range => AccRange}
 import org.calrissian.mango.types.LexiTypeEncoders
+import org.geotools.data.Query
 import org.geotools.factory.Hints.{ClassKey, IntegerKey}
 import org.geotools.filter.identity.FeatureIdImpl
 import org.geotools.geometry.jts.ReferencedEnvelope
@@ -77,7 +80,6 @@ package object index {
     if(getTableSharing(sft)) s"${sft.getTypeName}~"
     else                     ""
 
-
   val spec = "geom:Geometry:srid=4326,dtg:Date,dtg_end_time:Date"
   val indexSFT = SimpleFeatureTypes.createType("geomesa-idx", spec)
 
@@ -93,6 +95,19 @@ package object index {
   }
 
   type ExplainerOutputType = ( => String) => Unit
+
+  object ExplainerOutputType {
+
+    def toString(r: AccRange) = {
+      val first = if (r.isStartKeyInclusive) "[" else "("
+      val last =  if (r.isEndKeyInclusive) "]" else ")"
+      val start = Option(r.getStartKey).map(_.toStringNoTime).getOrElse("-inf")
+      val end = Option(r.getEndKey).map(_.toStringNoTime).getOrElse("+inf")
+      first + start + ", " + end + last
+    }
+
+    def toString(q: Query) = q.toString.replaceFirst("\\n\\s*", " ").replaceAll("\\n\\s*", ", ")
+  }
 
   object ExplainPrintln extends ExplainerOutputType {
     override def apply(v1: => String): Unit = println(v1)
