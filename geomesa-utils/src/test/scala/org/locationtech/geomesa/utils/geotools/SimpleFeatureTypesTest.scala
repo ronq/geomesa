@@ -1,3 +1,18 @@
+/*
+ * Copyright 2014 Commonwealth Computer Research, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.locationtech.geomesa.utils.geotools
 
 import org.junit.runner.RunWith
@@ -23,9 +38,29 @@ class SimpleFeatureTypesTest extends Specification {
         val geomDescriptor = sft.getGeometryDescriptor
         geomDescriptor.getLocalName must be equalTo "geom"
       }
-
       "encode an sft properly" >> {
         SimpleFeatureTypes.encodeType(sft) must be equalTo "id:Integer:index=false,dtg:Date:index=false,*geom:Point:srid=4326:index=true"
+      }
+    }
+
+    "handle namespaces" >> {
+      "simple ones" >> {
+        val sft = SimpleFeatureTypes.createType("ns:testing", "dtg:Date,*geom:Point:srid=4326")
+        sft.getName.getLocalPart mustEqual "testing"
+        sft.getName.getNamespaceURI mustEqual "ns"
+        sft.getTypeName mustEqual("testing")
+      }
+      "complex ones" >> {
+        val sft = SimpleFeatureTypes.createType("http://geomesa/ns:testing", "dtg:Date,*geom:Point:srid=4326")
+        sft.getName.getLocalPart mustEqual "testing"
+        sft.getName.getNamespaceURI mustEqual "http://geomesa/ns"
+        sft.getTypeName mustEqual("testing")
+      }
+      "invalid ones" >> {
+        val sft = SimpleFeatureTypes.createType("http://geomesa/ns:testing:", "dtg:Date,*geom:Point:srid=4326")
+        sft.getName.getLocalPart mustEqual "http://geomesa/ns:testing:"
+        sft.getName.getNamespaceURI must beNull
+        sft.getTypeName mustEqual("http://geomesa/ns:testing:")
       }
     }
 

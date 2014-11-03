@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 Commonwealth Computer Research, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.locationtech.geomesa.utils.geotools
 
 import java.util.{Date, UUID}
@@ -18,12 +34,12 @@ object SimpleFeatureTypes {
   val TABLE_SPLITTER_OPTIONS = "table.splitter.options"
 
   def createType(nameSpec: String, spec: String): SimpleFeatureType = {
-    val (namespace, name) =
-      nameSpec.split(":").toList match {
-        case n :: Nil => (null, n)
-        case ns :: n :: Nil => (ns, n)
-        case _ => throw new IllegalArgumentException(s"Invalid feature name: $nameSpec")
-      }
+    val nsIndex = nameSpec.lastIndexOf(':')
+    val (namespace, name) = if (nsIndex == -1 || nsIndex == nameSpec.length - 1) {
+      (null, nameSpec)
+    } else {
+      (nameSpec.substring(0, nsIndex), nameSpec.substring(nsIndex + 1))
+    }
 
     val FeatureSpec(attributeSpecs, opts) = parse(spec)
 
