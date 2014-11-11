@@ -16,22 +16,16 @@
 
 package org.locationtech.geomesa.core.index
 
-import java.util
-
 import com.typesafe.scalalogging.slf4j.Logging
-import com.vividsolutions.jts.geom._
+import com.vividsolutions.jts.geom.{Geometry, GeometryCollection, Point, Polygon}
 import org.apache.accumulo.core.data.Key
-import org.geotools.data._
-import org.geotools.data.simple.SimpleFeatureSource
-import org.geotools.data.store.{ContentFeatureSource, ContentEntry, ContentDataStore}
+import org.geotools.data.Query
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone, Interval}
 import org.locationtech.geomesa.core.data._
 import org.locationtech.geomesa.core.util._
 import org.locationtech.geomesa.utils.text.WKTUtils
-import org.opengis.feature.`type`.Name
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
-import org.opengis.filter.Filter
 
 import scala.annotation.tailrec
 import scala.util.parsing.combinator.RegexParsers
@@ -92,55 +86,6 @@ case class IndexSchema(encoder: IndexEntryEncoder,
   def explainQuery(q: Query, output: ExplainerOutputType = log) = {
      planner.getIterator(new ExplainingConnectorCreator(output), featureType, q, output)
   }
-}
-
-
-class MyHardWork extends DataStore {
-  override def updateSchema(typeName: String, featureType: SimpleFeatureType): Unit = ???
-
-  override def getLockingManager: LockingManager = ???
-
-  override def getSchema(typeName: String): SimpleFeatureType = ???
-
-  override def getFeatureWriter(typeName: String, filter: Filter, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getFeatureWriter(typeName: String, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def removeSchema(typeName: String): Unit = ???
-
-  override def getFeatureSource(typeName: String): SimpleFeatureSource = ???
-
-  override def getFeatureSource(typeName: Name): SimpleFeatureSource = ???
-
-  override def getFeatureReader(query: Query, transaction: Transaction): FeatureReader[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getFeatureWriterAppend(typeName: String, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getTypeNames: Array[String] = ???
-
-  override def getSchema(name: Name): SimpleFeatureType = ???
-
-  override def updateSchema(typeName: Name, featureType: SimpleFeatureType): Unit = ???
-
-  override def dispose(): Unit = ???
-
-  override def removeSchema(typeName: Name): Unit = ???
-
-  override def createSchema(featureType: SimpleFeatureType): Unit = ???
-
-  override def getInfo: ServiceInfo = ???
-
-  override def getNames: util.List[Name] = ???
-}
-
-class MyNewDataStore extends ContentDataStore {
-
-
-  override def createTypeNames(): util.List[Name] = ???
-
-  override def createFeatureSource(entry: ContentEntry): ContentFeatureSource = ???
-
-  override def getGeometryFactory: GeometryFactory = ???
 }
 
 object IndexSchema extends RegexParsers with Logging {

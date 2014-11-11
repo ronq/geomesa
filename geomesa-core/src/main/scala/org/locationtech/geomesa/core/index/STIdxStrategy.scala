@@ -51,7 +51,7 @@ class STIdxStrategy extends Strategy with Logging {
               query: Query,
               output: ExplainerOutputType): SelfClosingIterator[Entry[Key, Value]] = {
     val tryScanner = Try {
-      val bs = acc.createRasterIdxScanner(featureType)
+      val bs = acc.createSTIdxScanner(featureType)
       val qp = buildSTIdxQueryPlan(query, iqp, featureType, output)
       configureBatchScanner(bs, qp)
       // NB: Since we are (potentially) gluing multiple batch scanner iterators together,
