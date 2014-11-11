@@ -37,6 +37,7 @@ import java.util.Map.Entry
 
 import com.vividsolutions.jts.geom.{Polygon, Geometry}
 import org.apache.accumulo.core.data.{Value, Key}
+import org.geotools.coverage.grid.GridCoverage2D
 import org.geotools.data.{DataUtilities, Query}
 import org.geotools.factory.CommonFactoryFinder
 import org.geotools.geometry.jts.ReferencedEnvelope
@@ -51,6 +52,7 @@ import org.locationtech.geomesa.core.util.{SelfClosingIterator, CloseableIterato
 import org.locationtech.geomesa.utils.geotools.SimpleFeatureTypes
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
 import org.opengis.filter.sort.{SortOrder, SortBy}
+import org.opengis.parameter.GeneralParameterValue
 
 import scala.reflect.ClassTag
 
@@ -99,45 +101,30 @@ case class RasterQueryPlanner(schema: String,
   }
   **/
 
-  // As a pre-processing step, we examine the query/filter and split it into multiple queries.
-  // TODO: Work to make the queries non-overlapping.
+
   def getIterator(acc: AccumuloConnectorCreator,
-                  //sft: SimpleFeatureType,
-                  query: Query,
+                  sft: SimpleFeatureType,
+                  queryParameters:Array[GeneralParameterValue],
                   output: ExplainerOutputType = log): CloseableIterator[Entry[Key,Value]] = {
 
-    output(s"Running ${ExplainerOutputType.toString(query)}")
+    //output(s"Running ${ExplainerOutputType.toString(query)}")
     val ff = CommonFactoryFinder.getFilterFactory2
-    val isDensity = query.getHints.containsKey(BBOX_KEY)
-    val duplicatableData = IndexSchema.mayContainDuplicates(featureType)
+    //val isDensity = query.getHints.containsKey(BBOX_KEY)
+    //val duplicatableData = IndexSchema.mayContainDuplicates(featureType)
 
-    def flatten(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] =
-      queries.toIterator.ciFlatMap(configureScanners(acc, sft, _, isDensity, output))
+    //def flatten(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] =
+    //  queries.toIterator.ciFlatMap(configureScanners(acc, sft, _, isDensity, output))
 
     // in some cases, where duplicates may appear in overlapping queries or the data itself, remove them
-    def deduplicate(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] = {
-      val flatQueries = flatten(queries)
-      val decoder = SimpleFeatureDecoder(getReturnSFT(query), featureEncoding)
-      new DeDuplicatingIterator(flatQueries, (key: Key, value: Value) => decoder.extractFeatureId(value))
-    }
+    //def deduplicate(queries: Seq[Query]): CloseableIterator[Entry[Key, Value]] = {
+    //  val flatQueries = flatten(queries)
+    //  val decoder = SimpleFeatureDecoder(getReturnSFT(query), featureEncoding)
+    //  new DeDuplicatingIterator(flatQueries, (key: Key, value: Value) => decoder.extractFeatureId(value))
 
-    if(isDensity) {
-      val env = query.getHints.get(BBOX_KEY).asInstanceOf[ReferencedEnvelope]
-      val q1 = new Query(featureType.getTypeName, ff.bbox(ff.property(featureType.getGeometryDescriptor.getLocalName), env))
-      val mixedQuery = DataUtilities.mixQueries(q1, query, "geomesa.mixed.query")
-      if (duplicatableData) {
-        deduplicate(Seq(mixedQuery))
-      } else {
-        flatten(Seq(mixedQuery))
-      }
-    } else {
-      val rawQueries = splitQueryOnOrs(query, output)
-      if (rawQueries.length > 1 || duplicatableData) {
-        deduplicate(rawQueries)
-      } else {
-        flatten(rawQueries)
-      }
-    }
+    configureScanners(acc, sft, queryParameters, output)
+
+
+
   }
 
 
@@ -153,41 +140,35 @@ case class RasterQueryPlanner(schema: String,
    */
   private def configureScanners(acc: AccumuloConnectorCreator,
                                 sft: SimpleFeatureType,
-                                derivedQuery: Query,
-                                isDensity: Boolean,
+                                queryParameters:Array[GeneralParameterValue],
                                 output: ExplainerOutputType): SelfClosingIterator[Entry[Key, Value]] = {
-    output(s"Transforms: ${derivedQuery.getHints.get(TRANSFORMS)}")
+    //output(s"Transforms: ${derivedQuery.getHints.get(TRANSFORMS)}")
+    // we do not yet need a strategy decider per se. There should be only one!
     val strategy = QueryStrategyDecider.chooseStrategy(acc.catalogTableFormat(sft), sft, derivedQuery)
 
     output(s"Strategy: ${strategy.getClass.getCanonicalName}")
-    strategy.execute(acc, this, sft, derivedQuery, output)
+    strategy.execute(acc, this, sft, queryParameters, output)
   }
 
-  def query(query: Query, acc: AccumuloConnectorCreator): CloseableIterator[SimpleFeature] = {
-    // Perform the query
-    val accumuloIterator = getIterator(acc, featureType, query)
-
-    // Convert Accumulo results to SimpleFeatures
-    adaptIterator(accumuloIterator, query)
+  // this is the entry point from CoverageReader for now.
+  // this is the equivalent of the query for vector features
+  def getScanBuffers(queryParameters:Array[GeneralParameterValue], acc: AccumuloConnectorCreator): CloseableIterator[GridCoverage2D] = {
+     // Perform the Accumulo query
+     val noSFT: SimpleFeatureType = null
+     val accumuloIterator = getIterator(acc,sft,queryParameters,output)
+     // Convert Accumulo results to GridCoverage2Ds
+     adaptIterator(accumuloIterator)
   }
+
 
   // This function decodes/transforms that Iterator of Accumulo Key-Values into an Iterator of SimpleFeatures.
-  def adaptIterator(accumuloIterator: CloseableIterator[Entry[Key,Value]], query: Query): CloseableIterator[SimpleFeature] = {
+  def adaptIterator(accumuloIterator: CloseableIterator[Entry[Key]): CloseableIterator[GridCoverage2D] = {
     // Perform a projecting decode of the simple feature
-    val returnSFT = getReturnSFT(query)
-    val decoder = SimpleFeatureDecoder(returnSFT, featureEncoding)
+    //val returnSFT = getReturn(query)
+    //val decoder = SimpleFeatureDecoder(returnSFT, featureEncoding)
+    val decoder = ???
 
-    // Decode according to the SFT return type.
-    // if this is a density query, expand the map
-    if (query.getHints.containsKey(DENSITY_KEY)) {
-      accumuloIterator.flatMap { kv: Entry[Key, Value] =>
-        DensityIterator.expandFeature(decoder.decode(kv.getValue))
-      }
-    } else {
-      val features = accumuloIterator.map { kv => decoder.decode(kv.getValue) }
-      if(query.getSortBy != null && query.getSortBy.length > 0) sort(features, query.getSortBy)
-      else features
-    }
+    accumuloIterator.map { kv => decoder.decode(kv.getKey, kv.getValue) }
   }
 }
 

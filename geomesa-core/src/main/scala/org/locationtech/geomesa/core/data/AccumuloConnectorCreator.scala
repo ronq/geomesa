@@ -29,4 +29,11 @@ trait AccumuloConnectorCreator extends Logging {
   def createRecordScanner(sft: SimpleFeatureType, numThreads: Int = 0) : BatchScanner
 
   def catalogTableFormat(sft: SimpleFeatureType): Boolean
+
+   /**
+   * Create a BatchScanner for the Raster Index Table
+   */
+  def createRasterIdxScanner(sft: SimpleFeatureType): BatchScanner
+
+
 }

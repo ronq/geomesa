@@ -71,23 +71,27 @@ import org.opengis.filter.expression.{Expression, Literal, PropertyName}
 import org.opengis.filter.spatial.BBOX
 import org.opengis.filter.spatial.BinarySpatialOperator
 import org.opengis.filter.spatial.{BBOX, BinarySpatialOperator}
+import org.opengis.parameter.GeneralParameterValue
 
 class RasterIdxStrategy extends Strategy with Logging {
 
   def execute(acc: AccumuloConnectorCreator,
               iqp: QueryPlanner,
               featureType: SimpleFeatureType,
-              query: Query,
+              queryParameters: Array[GeneralParameterValue],
               output: ExplainerOutputType): SelfClosingIterator[Entry[Key, Value]] = {
-    val bs = acc.createSTIdxScanner(featureType)
-    val qp = buildRasterIdxQueryPlan(query, iqp, featureType, output)
+    // this needs to be implemented in the CoverageStore
+    // it creates the connection to Accumulo and perhaps the correct table
+    val bs = acc.createRasterIdxScanner(featureType)
+
+    val qp = buildRasterIdxQueryPlan(queryParameters, iqp, featureType, output)
     configureBatchScanner(bs, qp)
     // NB: Since we are (potentially) gluing multiple batch scanner iterators together,
     //  we wrap our calls in a SelfClosingBatchScanner.
     SelfClosingBatchScanner(bs)
   }
 
-  def buildRasterIdxQueryPlan(query: Query,
+  def buildRasterIdxQueryPlan(queryParameters: Array[GeneralParameterValue],
                           iqp: QueryPlanner,
                           featureType: SimpleFeatureType,
                           output: ExplainerOutputType) = {
@@ -99,23 +103,26 @@ class RasterIdxStrategy extends Strategy with Logging {
     output(s"Scanning ST index table for feature type ${featureType.getTypeName}")
     output(s"Filter: ${query.getFilter}")
 
+    val parsedRequest = RasterRequest(queryParameters)
+
     // TODO: Select only the geometry filters which involve the indexed geometry type.
     // https://geomesa.atlassian.net/browse/GEOMESA-200
     // Simiarly, we should only extract temporal filters for the index date field.
-    val (geomFilters, otherFilters) = partitionGeom(query.getFilter)
-    val (temporalFilters, ecqlFilters) = partitionTemporal(otherFilters, getDtgFieldName(featureType))
+    //val (geomFilters, otherFilters) = partitionGeom(query.getFilter)
+    //val (temporalFilters, ecqlFilters) = partitionTemporal(otherFilters, getDtgFieldName(featureType))
 
-    val ecql = filterListAsAnd(ecqlFilters).map(ECQL.toCQL)
+    //val ecql = filterListAsAnd(ecqlFilters).map(ECQL.toCQL)
 
-    output(s"Geometry filters: $geomFilters")
-    output(s"Temporal filters: $temporalFilters")
-    output(s"Other filters: $ecqlFilters")
+    //output(s"Geometry filters: $geomFilters")
+    //output(s"Temporal filters: $temporalFilters")
+    //output(s"Other filters: $ecqlFilters")
 
-    val tweakedGeoms = geomFilters.map(updateTopologicalFilters(_, featureType))
+    //val tweakedGeoms = geomFilters.map(updateTopologicalFilters(_, featureType))
 
-    output(s"Tweaked geom filters are $tweakedGeoms")
+    //output(s"Tweaked geom filters are $tweakedGeoms")
 
     // standardize the two key query arguments:  polygon and date-range
+    /**
     val geomsToCover = tweakedGeoms.flatMap {
       case bbox: BBOX =>
         val bboxPoly = bbox.getExpression2.asInstanceOf[Literal].evaluate(null, classOf[Geometry])
@@ -124,42 +131,43 @@ class RasterIdxStrategy extends Strategy with Logging {
         extractGeometry(gf)
       case _ => Seq()
     }
-
+    **/
+    /**
     val collectionToCover: Geometry = geomsToCover match {
       case Nil => null
       case seq: Seq[Geometry] => new GeometryCollection(geomsToCover.toArray, geomsToCover.head.getFactory)
     }
+    **/
+    //val temporal = extractTemporal(temporalFilters)
+    //val interval = netInterval(temporal)
+    //val geometryToCover = netGeom(collectionToCover)
+    //val filter = buildFilter(geometryToCover, interval)
 
-    val temporal = extractTemporal(temporalFilters)
-    val interval = netInterval(temporal)
-    val geometryToCover = netGeom(collectionToCover)
-    val filter = buildFilter(geometryToCover, interval)
+    //output(s"GeomsToCover: $geomsToCover")
 
-    output(s"GeomsToCover: $geomsToCover")
+    //val ofilter = filterListAsAnd(tweakedGeoms ++ temporalFilters)
+    //if (ofilter.isEmpty) logger.warn(s"Querying Accumulo without ST filter.")
 
-    val ofilter = filterListAsAnd(tweakedGeoms ++ temporalFilters)
-    if (ofilter.isEmpty) logger.warn(s"Querying Accumulo without ST filter.")
-
-    val oint  = IndexSchema.somewhen(interval)
+    //val oint  = IndexSchema.somewhen(interval)
 
     // set up row ranges and regular expression filter
     val qp = planQuery(filter, output, keyPlanner, cfPlanner)
 
-    output(s"STII Filter: ${ofilter.getOrElse("No STII Filter")}")
-    output(s"Interval:  ${oint.getOrElse("No interval")}")
-    output(s"Filter: ${Option(filter).getOrElse("No Filter")}")
+    //output(s"STII Filter: ${ofilter.getOrElse("No STII Filter")}")
+    //output(s"Interval:  ${oint.getOrElse("No interval")}")
+    //output(s"Filter: ${Option(filter).getOrElse("No Filter")}")
 
-    val iteratorConfig = IteratorTrigger.chooseIterator(ecql, query, featureType)
+    //val iteratorConfig = IteratorTrigger.chooseIterator(ecql, query, featureType)
 
-    val stiiIterCfg = getSTIIIterCfg(iteratorConfig, query, featureType, ofilter, schema, featureEncoding)
+    //val stiiIterCfg = getSTIIIterCfg(iteratorConfig, query, featureType, ofilter, schema, featureEncoding)
 
-    val sffiIterCfg = getSFFIIterCfg(iteratorConfig, featureType, ecql, schema, featureEncoding, query)
+    //val sffiIterCfg = getSFFIIterCfg(iteratorConfig, featureType, ecql, schema, featureEncoding, query)
 
-    val topIterCfg = getTopIterCfg(query, geometryToCover, schema, featureEncoding, featureType)
+    //val topIterCfg = getTopIterCfg(query, geometryToCover, schema, featureEncoding, featureType)
 
     qp.copy(iterators = qp.iterators ++ List(Some(stiiIterCfg), sffiIterCfg, topIterCfg).flatten)
   }
-
+  /**
   def getSTIIterCfg(iteratorConfig: IteratorConfig,
                      query: Query,
                      featureType: SimpleFeatureType,
@@ -174,7 +182,7 @@ class RasterIdxStrategy extends Strategy with Logging {
         configureSpatioTemporalIntersectingIterator(ofilter, featureType, schema, isDensity)
     }
   }
-
+  **/
 
   // establishes the regular expression that defines (minimally) acceptable rows
   def configureRowRegexIterator(regex: String): IteratorSetting = {
@@ -183,7 +191,7 @@ class RasterIdxStrategy extends Strategy with Logging {
     RegExFilter.setRegexs(cfg, regex, null, null, null, false)
     cfg
   }
-
+  /**
   // returns an iterator over [key,value] pairs where the key is taken from the index row and the value is a SimpleFeature,
   // which is either read directory from the data row  value or generated from the encoded index row value
   // -- for items that either:
@@ -219,7 +227,7 @@ class RasterIdxStrategy extends Strategy with Logging {
     if (isDensity) cfg.addOption(GEOMESA_ITERATORS_IS_DENSITY_TYPE, "isDensity")
     cfg
   }
-
+  **/
   def buildFilter(geom: Geometry, interval: Interval): KeyPlanningFilter =
     (IndexSchema.somewhere(geom), IndexSchema.somewhen(interval)) match {
       case (None, None)       =>    AcceptEverythingFilter

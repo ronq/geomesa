@@ -30,4 +30,9 @@ class ExplainingConnectorCreator(output: ExplainerOutputType) extends AccumuloCo
   override def createRecordScanner(sft: SimpleFeatureType, numThreads: Int): BatchScanner = new ExplainingBatchScanner(output)
 
   override def catalogTableFormat(sft: SimpleFeatureType): Boolean = true
+
+  /**
+   * Create a BatchScanner for the Raster Index Table
+   */
+  override def createRasterIdxScanner(sft: SimpleFeatureType): BatchScanner = new ExplainingBatchScanner(output)
 }

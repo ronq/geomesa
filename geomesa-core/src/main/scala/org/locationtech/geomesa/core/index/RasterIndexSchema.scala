@@ -1,37 +1,34 @@
 /*
- * Copyright 2014 Commonwealth Computer Research, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright 2014-2014 Commonwealth Computer Research, Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+
 
 package org.locationtech.geomesa.core.index
 
-import java.util
 
 import com.typesafe.scalalogging.slf4j.Logging
-import com.vividsolutions.jts.geom._
+import com.vividsolutions.jts.geom.{Geometry, GeometryCollection, Point, Polygon}
 import org.apache.accumulo.core.data.Key
-import org.geotools.data._
-import org.geotools.data.simple.SimpleFeatureSource
-import org.geotools.data.store.{ContentFeatureSource, ContentEntry, ContentDataStore}
+import org.geotools.data.Query
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone, Interval}
 import org.locationtech.geomesa.core.data._
 import org.locationtech.geomesa.core.util._
 import org.locationtech.geomesa.utils.text.WKTUtils
-import org.opengis.feature.`type`.Name
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
-import org.opengis.filter.Filter
 
 import scala.annotation.tailrec
 import scala.util.parsing.combinator.RegexParsers
@@ -71,7 +68,7 @@ import scala.util.parsing.combinator.RegexParsers
 // an example of a fully specified index schema:
 //
 // %~#s%999#r%0,4#gh%HHmm#d::%~#s%4,2#gh::%~#s%6,1#gh%yyyyMMdd#d
-
+/**
 case class IndexSchema(encoder: IndexEntryEncoder,
                        decoder: IndexEntryDecoder,
                        planner: QueryPlanner,
@@ -90,65 +87,16 @@ case class IndexSchema(encoder: IndexEntryEncoder,
 
   // Writes out an explanation of how a query would be run.
   def explainQuery(q: Query, output: ExplainerOutputType = log) = {
-     planner.getIterator(new ExplainingConnectorCreator(output), featureType, q, output)
+    planner.getIterator(new ExplainingConnectorCreator(output), featureType, q, output)
   }
 }
-
-
-class MyHardWork extends DataStore {
-  override def updateSchema(typeName: String, featureType: SimpleFeatureType): Unit = ???
-
-  override def getLockingManager: LockingManager = ???
-
-  override def getSchema(typeName: String): SimpleFeatureType = ???
-
-  override def getFeatureWriter(typeName: String, filter: Filter, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getFeatureWriter(typeName: String, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def removeSchema(typeName: String): Unit = ???
-
-  override def getFeatureSource(typeName: String): SimpleFeatureSource = ???
-
-  override def getFeatureSource(typeName: Name): SimpleFeatureSource = ???
-
-  override def getFeatureReader(query: Query, transaction: Transaction): FeatureReader[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getFeatureWriterAppend(typeName: String, transaction: Transaction): FeatureWriter[SimpleFeatureType, SimpleFeature] = ???
-
-  override def getTypeNames: Array[String] = ???
-
-  override def getSchema(name: Name): SimpleFeatureType = ???
-
-  override def updateSchema(typeName: Name, featureType: SimpleFeatureType): Unit = ???
-
-  override def dispose(): Unit = ???
-
-  override def removeSchema(typeName: Name): Unit = ???
-
-  override def createSchema(featureType: SimpleFeatureType): Unit = ???
-
-  override def getInfo: ServiceInfo = ???
-
-  override def getNames: util.List[Name] = ???
-}
-
-class MyNewDataStore extends ContentDataStore {
-
-
-  override def createTypeNames(): util.List[Name] = ???
-
-  override def createFeatureSource(entry: ContentEntry): ContentFeatureSource = ???
-
-  override def getGeometryFactory: GeometryFactory = ???
-}
-
-object IndexSchema extends RegexParsers with Logging {
-  val minDateTime = new DateTime(0, 1, 1, 0, 0, 0, DateTimeZone.forID("UTC"))
-  val maxDateTime = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeZone.forID("UTC"))
-  val everywhen = new Interval(minDateTime, maxDateTime)
-  val everywhere = WKTUtils.read("POLYGON((-180 -90, 0 -90, 180 -90, 180 90, 0 90, -180 90, -180 -90))").asInstanceOf[Polygon]
-
+**/
+object RasterIndexSchema extends IndexSchema {
+  //val minDateTime = new DateTime(0, 1, 1, 0, 0, 0, DateTimeZone.forID("UTC"))
+  //val maxDateTime = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeZone.forID("UTC"))
+  //val everywhen = new Interval(minDateTime, maxDateTime)
+  //val everywhere = WKTUtils.read("POLYGON((-180 -90, 0 -90, 180 -90, 180 90, 0 90, -180 90, -180 -90))").asInstanceOf[Polygon]
+  /**
   def somewhen(interval: Interval): Option[Interval] =
     interval match {
       case null                => None
@@ -242,9 +190,9 @@ object IndexSchema extends RegexParsers with Logging {
   // a key element consists of a separator and any number of random partitions, geohashes, and dates
   def keypart: Parser[CompositeTextFormatter] =
     (sep ~ rep(randEncoder | geohashEncoder | dateEncoder | constantStringEncoder | resolutionEncoder | bandEncoder)) ^^
-    {
-      case sep ~ xs => CompositeTextFormatter(xs, sep)
-    }
+      {
+        case sep ~ xs => CompositeTextFormatter(xs, sep)
+      }
 
   // the column qualifier must end with an ID-encoder
   def cqpart: Parser[CompositeTextFormatter] =
@@ -283,14 +231,14 @@ object IndexSchema extends RegexParsers with Logging {
       // build a non-None list of these date extractors
       val netVals : Iterable[(AbstractExtractor,String)] =
         rowVals.map(_ match { case (f,offset) => { (RowExtractor(offset, f.length), f)}}) ++
-        cfVals.map(_ match { case (f,offset) => { (ColumnFamilyExtractor(offset, f.length), f)}}) ++
-        cqVals.map(_ match { case (f,offset) => { (ColumnQualifierExtractor(offset, f.length), f)}})
+          cfVals.map(_ match { case (f,offset) => { (ColumnFamilyExtractor(offset, f.length), f)}}) ++
+          cqVals.map(_ match { case (f,offset) => { (ColumnQualifierExtractor(offset, f.length), f)}})
 
       // consolidate this into a single extractor-sequence and date format
       val consolidatedVals: (Seq[AbstractExtractor],String) = netVals.
         foldLeft((List[AbstractExtractor](),""))((t1,t2) => t1 match { case (extractors,fs) =>
-          t2 match { case (extractor,f) => (extractors ++ List(extractor), fs + f)
-      }})
+        t2 match { case (extractor,f) => (extractors ++ List(extractor), fs + f)
+        }})
 
       // issue:  not all schema contain a date-portion;
       // for those that do, you have already parsed it;
@@ -299,7 +247,7 @@ object IndexSchema extends RegexParsers with Logging {
         case (extractors,fs) if (!extractors.isEmpty) => Some(DateDecoder(extractors, fs))
         case _ => None
       }
-  }}
+    }}
 
   def buildDateDecoder(s: String): Option[DateDecoder] = parse(dateDecoderParser, s).get
 
@@ -371,12 +319,13 @@ object IndexSchema extends RegexParsers with Logging {
   def bandKeyPlanner: Parser[BandPlanner] = bandPattern ^^ {
     case b => BandPlanner(b)
   }
+  **/
 
   def keyPlanner: Parser[KeyPlanner] =
     sep ~ rep(constStringPlanner | datePlanner | randPartitionPlanner | geohashKeyPlanner | resolutionKeyPlanner | bandKeyPlanner) <~ "::.*".r ^^ {
       case sep ~ list => CompositePlanner(list, sep)
     }
-
+  /**
   def buildKeyPlanner(s: String) = parse(keyPlanner, s) match {
     case Success(result, _) => result
     case fail: NoSuccess => throw new Exception(fail.msg)
@@ -567,3 +516,4 @@ class IndexSchemaBuilder(separator: String) {
     this
   }
 }
+**/
