@@ -34,6 +34,7 @@ import org.geotools.factory.Hints
 import org.geotools.feature.NameImpl
 import org.geotools.geometry.jts.ReferencedEnvelope
 import org.geotools.process.vector.TransformProcess
+import org.geotools.referencing.crs.DefaultGeographicCRS
 import org.locationtech.geomesa.core
 import org.locationtech.geomesa.core.data.AccumuloDataStore._
 import org.locationtech.geomesa.core.data.FeatureEncoding.FeatureEncoding
@@ -674,7 +675,7 @@ class AccumuloDataStore(val connector: Connector,
   def writeBounds(featureName: String, bounds: ReferencedEnvelope) {
     // prepare to write out properties to the Accumulo SHP-file table
     val newbounds = metadata.read(featureName, BOUNDS_KEY) match {
-      case Some(env) => getNewBounds(env, featureName, bounds)
+      case Some(env) => getNewBounds(env, bounds)
       case None      => bounds
     }
 
@@ -684,12 +685,10 @@ class AccumuloDataStore(val connector: Connector,
     metadata.insert(featureName, BOUNDS_KEY, encoded)
   }
 
-  private def getNewBounds(env: String, featureName: String, bounds: ReferencedEnvelope) = {
-    val oldBounds = stringToReferencedEnvelope(env,
-                                                getSchema(featureName).getCoordinateReferenceSystem)
-    val projBounds = bounds.transform(oldBounds.getCoordinateReferenceSystem, true)
-    projBounds.expandToInclude(oldBounds)
-    projBounds
+  private def getNewBounds(env: String, bounds: ReferencedEnvelope) = {
+    val oldBounds = stringToReferencedEnvelope(env, DefaultGeographicCRS.WGS84)
+    oldBounds.expandToInclude(bounds)
+    oldBounds
   }
 
   /**
@@ -732,14 +731,14 @@ class AccumuloDataStore(val connector: Connector,
   }
 
   /* create a general purpose writer that is capable of insert, deletes, and updates */
-  override def createFeatureWriter(typeName: String, transaction: Transaction): SFFeatureWriter = {
+  override def getFeatureWriter(typeName: String, filter: Filter, transaction: Transaction): SFFeatureWriter = {
     validateMetadata(typeName)
     checkWritePermissions(typeName)
     val sft = getSchema(typeName)
     val indexSchemaFmt = getIndexSchemaFmt(typeName)
     val fe = SimpleFeatureEncoder(sft, getFeatureEncoding(sft))
     val encoder = IndexSchema.buildKeyEncoder(indexSchemaFmt, fe)
-    new ModifyAccumuloFeatureWriter(sft, encoder, connector, fe, writeVisibilities, this)
+    new ModifyAccumuloFeatureWriter(sft, encoder, connector, fe, writeVisibilities, filter, this)
   }
 
   /* optimized for GeoTools API to return writer ONLY for appending (aka don't scan table) */
