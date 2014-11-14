@@ -34,6 +34,7 @@ import org.geotools.parameter.Parameter
 import org.geotools.util.{DateRange, Utilities}
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
+import org.locationtech.geomesa.core.index.RasterQueryPlanner
 import org.locationtech.geomesa.core.iterators.{AggregatingKeyIterator, SurfaceAggregatingIterator, TimestampRangeIterator, TimestampSetIterator}
 import org.locationtech.geomesa.core.util.{BoundingBoxUtil, SelfClosingBatchScanner}
 import org.locationtech.geomesa.utils.geohash.{BoundingBox, Bounds, GeoHash, TwoGeoHashBoundingBox}
@@ -94,6 +95,10 @@ class CoverageReader(val url: String) extends AbstractGridCoverage2DReader() wit
     .map(entry => (entry.getKey.getColumnFamily.toString, entry.getKey.getColumnQualifier.toString))
     .toMap
   }
+
+  // temp changes -- MCR
+  val planner: RasterQueryPlanner = ???
+  val schema = RasterIndexSchema(planner,table)
 
   /**
    * Default implementation does not allow a non-default coverage name

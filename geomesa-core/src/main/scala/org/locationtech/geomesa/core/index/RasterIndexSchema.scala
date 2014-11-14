@@ -68,35 +68,22 @@ import scala.util.parsing.combinator.RegexParsers
 // an example of a fully specified index schema:
 //
 // %~#s%999#r%0,4#gh%HHmm#d::%~#s%4,2#gh::%~#s%6,1#gh%yyyyMMdd#d
-/**
-case class IndexSchema(encoder: IndexEntryEncoder,
-                       decoder: IndexEntryDecoder,
+
+case class RasterIndexSchema(//encoder: CQEntryEncoder,
+                       //decoder: CQEntryDecoder,
                        planner: QueryPlanner,
-                       featureType: SimpleFeatureType) extends ExplainingLogging {
-
-  def encode(entry: SimpleFeature, visibility: String = "") = encoder.encode(entry, visibility)
-  def decode(key: Key): SimpleFeature = decoder.decode(key)
-
-
-  // utility method to ask for the maximum allowable shard number
-  def maxShard: Int =
-    encoder.rowf match {
-      case CompositeTextFormatter(Seq(PartitionTextFormatter(numPartitions), xs@_*), sep) => numPartitions
-      case _ => 1  // couldn't find a matching partitioner
-    }
-
-  // Writes out an explanation of how a query would be run.
-  def explainQuery(q: Query, output: ExplainerOutputType = log) = {
-    planner.getIterator(new ExplainingConnectorCreator(output), featureType, q, output)
-  }
+                       tableName: String) extends ExplainingLogging {
+  // this is where Andrew's work gets plugged in
+  //def encode(entry: SimpleFeature, visibility: String = "") = encoder.encode(entry, visibility)
+  //def decode(key: Key): SimpleFeature = decoder.decode(key)
 }
-**/
-object RasterIndexSchema extends IndexSchema {
-  //val minDateTime = new DateTime(0, 1, 1, 0, 0, 0, DateTimeZone.forID("UTC"))
-  //val maxDateTime = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeZone.forID("UTC"))
-  //val everywhen = new Interval(minDateTime, maxDateTime)
-  //val everywhere = WKTUtils.read("POLYGON((-180 -90, 0 -90, 180 -90, 180 90, 0 90, -180 90, -180 -90))").asInstanceOf[Polygon]
-  /**
+
+object RasterIndexSchema {
+  val minDateTime = new DateTime(0, 1, 1, 0, 0, 0, DateTimeZone.forID("UTC"))
+  val maxDateTime = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeZone.forID("UTC"))
+  val everywhen = new Interval(minDateTime, maxDateTime)
+  val everywhere = WKTUtils.read("POLYGON((-180 -90, 0 -90, 180 -90, 180 90, 0 90, -180 90, -180 -90))").asInstanceOf[Polygon]
+
   def somewhen(interval: Interval): Option[Interval] =
     interval match {
       case null                => None
@@ -319,13 +306,13 @@ object RasterIndexSchema extends IndexSchema {
   def bandKeyPlanner: Parser[BandPlanner] = bandPattern ^^ {
     case b => BandPlanner(b)
   }
-  **/
+
 
   def keyPlanner: Parser[KeyPlanner] =
     sep ~ rep(constStringPlanner | datePlanner | randPartitionPlanner | geohashKeyPlanner | resolutionKeyPlanner | bandKeyPlanner) <~ "::.*".r ^^ {
       case sep ~ list => CompositePlanner(list, sep)
     }
-  /**
+
   def buildKeyPlanner(s: String) = parse(keyPlanner, s) match {
     case Success(result, _) => result
     case fail: NoSuccess => throw new Exception(fail.msg)
@@ -516,4 +503,4 @@ class IndexSchemaBuilder(separator: String) {
     this
   }
 }
-**/
+
