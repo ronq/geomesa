@@ -56,6 +56,8 @@ import org.opengis.parameter.GeneralParameterValue
 
 import scala.reflect.ClassTag
 
+case class RasterQueryPlan(iterators: Seq[IteratorSetting], ranges: Seq[org.apache.accumulo.core.data.Range], cf: Seq[Text], cq: ???)
+
 object RasterQueryPlanner {
   val iteratorPriority_RowRegex                        = 0
   val iteratorPriority_AttributeIndexFilteringIterator = 10
@@ -68,9 +70,13 @@ object RasterQueryPlanner {
 }
 
 case class RasterQueryPlanner(schema: String,
-                        featureType: SimpleFeatureType,
-                        featureEncoding: FeatureEncoding) extends ExplainingLogging {
+                        coverageName: String,
+                        rasterEncoding: ???) extends ExplainingLogging {
   // this is in QueryPlanner, and can be used without modification
+  //TODO: these should be pulled into a trait so that QueryPlanner and RasterQueryPlanner can extend them
+  // also confirm that these methods are present in some or all of the IdxStategies and remove them,
+  // instead using the trait.
+
   /**
   def buildFilter(geom: Geometry, interval: Interval): KeyPlanningFilter =
     (IndexSchema.somewhere(geom), IndexSchema.somewhen(interval)) match {
@@ -101,7 +107,7 @@ case class RasterQueryPlanner(schema: String,
   }
   **/
 
-
+  // TODO: this needs to be fleshed out and corrected
   def getIterator(acc: AccumuloConnectorCreator,
                   sft: SimpleFeatureType,
                   queryParameters:Array[GeneralParameterValue],
@@ -126,25 +132,14 @@ case class RasterQueryPlanner(schema: String,
 
 
   }
-
-
-
-  /**
-   * Helper method to execute a query against an AccumuloDataStore
-   *
-   * If the query contains ONLY an eligible LIKE
-   * or EQUALTO query then satisfy the query with the attribute index
-   * table...else use the spatio-temporal index table
-   *
-   * If the query is a density query use the spatio-temporal index table only
-   */
+  //TODO: this needs to be fleshed out and corrected
   private def configureScanners(acc: AccumuloConnectorCreator,
                                 sft: SimpleFeatureType,
                                 queryParameters:Array[GeneralParameterValue],
                                 output: ExplainerOutputType): SelfClosingIterator[Entry[Key, Value]] = {
     //output(s"Transforms: ${derivedQuery.getHints.get(TRANSFORMS)}")
     // we do not yet need a strategy decider per se. There should be only one!
-    val strategy = QueryStrategyDecider.chooseStrategy(acc.catalogTableFormat(sft), sft, derivedQuery)
+    val strategy = RasterQueryStrategy
 
     output(s"Strategy: ${strategy.getClass.getCanonicalName}")
     strategy.execute(acc, this, sft, queryParameters, output)
@@ -152,6 +147,8 @@ case class RasterQueryPlanner(schema: String,
 
   // this is the entry point from CoverageReader for now.
   // this is the equivalent of the query for vector features
+  // TODO: cleanup and flesh out  and correct
+  //
   def getScanBuffers(queryParameters:Array[GeneralParameterValue], acc: AccumuloConnectorCreator): CloseableIterator[GridCoverage2D] = {
      // Perform the Accumulo query
      val noSFT: SimpleFeatureType = null
@@ -162,6 +159,7 @@ case class RasterQueryPlanner(schema: String,
 
 
   // This function decodes/transforms that Iterator of Accumulo Key-Values into an Iterator of SimpleFeatures.
+  //TODO: plugin the serialization details and cleanup and correct
   def adaptIterator(accumuloIterator: CloseableIterator[Entry[Key]): CloseableIterator[GridCoverage2D] = {
     // Perform a projecting decode of the simple feature
     //val returnSFT = getReturn(query)

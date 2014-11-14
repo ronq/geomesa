@@ -28,8 +28,6 @@ import org.opengis.geometry.Envelope
 import org.opengis.parameter.{InvalidParameterValueException, GeneralParameterValue}
 import org.geotools.parameter.Parameter
 
-//import scala.collection.JavaConversions._
-
 trait GeneralRequest {
    def geomParam: Envelope
    def dtgParam: Option[Either[Date, DateRange]]

@@ -228,6 +228,7 @@ class RasterIdxStrategy extends Strategy with Logging {
     cfg
   }
   **/
+  //TODO : these should come from a trait shared with QueryPlanner and RasterQueryPlanner
   def buildFilter(geom: Geometry, interval: Interval): KeyPlanningFilter =
     (IndexSchema.somewhere(geom), IndexSchema.somewhen(interval)) match {
       case (None, None)       =>    AcceptEverythingFilter
@@ -288,11 +289,14 @@ class RasterIdxStrategy extends Strategy with Logging {
       case _ =>
         Seq()
     }
+    // do CQ stuff here
 
-    QueryPlan(iters, accRanges, cf)
+    RasterQueryPlan(iters, accRanges, cf, cq)
   }
 }
 
+
+// nothing in this object may be needed.
 object RasterIdxStrategy {
 
   import org.locationtech.geomesa.core.filter.spatialFilters
