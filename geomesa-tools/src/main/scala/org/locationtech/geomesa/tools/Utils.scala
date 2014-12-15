@@ -55,21 +55,28 @@ object Utils {
   }
 
   object Formats {
-    val CSV = "csv"
-    val TSV = "tsv"
-    val SHP = "shp"
-    val JSON = "json"
+    val CSV     = "csv"
+    val TSV     = "tsv"
+    val TIFF    = "tiff"
+    val DTED    = "dted"
+    val SHP     = "shp"
+    val JSON    = "json"
     val GeoJson = "geojson"
     val GML = "gml"
 
     def getFileExtension(name: String) =
-      name match {
-        case _ if name.toLowerCase.endsWith(CSV) => CSV
-        case _ if name.toLowerCase.endsWith(TSV) => TSV
-        case _ if name.toLowerCase.endsWith(SHP) => SHP
-        case _ if name.toLowerCase.endsWith(JSON) => JSON
-        case _ if name.toLowerCase.endsWith(GML) => GML
-        case _ => "unknown"
+      name.toLowerCase match {
+        case _ if name.endsWith(CSV)  => CSV
+        case _ if name.endsWith("tif") ||
+                  name.endsWith("tiff") => TIFF
+        case _ if name.endsWith("dt0") ||
+                  name.endsWith("dt1") ||
+                  name.endsWith("dt2")=> DTED
+        case _ if name.endsWith(TSV)  => TSV
+        case _ if name.endsWith(SHP)  => SHP
+        case _ if name.endsWith(JSON) => JSON
+        case _ if name.endsWith(GML)  => GML
+        case _                        => "unknown"
       }
 
     val All = List(CSV, TSV, SHP, JSON, GeoJson, GML)
