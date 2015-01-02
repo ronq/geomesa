@@ -35,6 +35,8 @@ object GeoMesaCoverageReader {
   val GeoServerDateFormat = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
   val DefaultDateString = GeoServerDateFormat.print(new DateTime(DateTimeZone.forID("UTC")))
   val FORMAT = """accumulo://(.*):(.*)@(.*)/(.*)#rasterName=(.*)#zookeepers=([^#]*)(?:#auths=)?(.*)$""".r
+  // TODO: WCS: make this handle names without semicolons
+  val coverageNameFORMAT =  """(.*):(.*)$""".r
 }
 
 import org.locationtech.geomesa.plugin.wcs.GeoMesaCoverageReader._
@@ -50,7 +52,10 @@ class GeoMesaCoverageReader(val url: String, hints: Hints) extends AbstractGridC
   val FORMAT(user, password, instanceId, table, rasterName, zookeepers, authtokens) = url
   logger.debug(s"extracted user $user, password ********, instance id $instanceId, table $table, zookeepers $zookeepers, auths ********")
 
+  // TODO: WCS: Fix this--- rasterName should be resolutionTag instead, and it should be optional
+  // coverageName = table if resolutionTag is not defined
   coverageName = table + ":" + rasterName
+
 
   // TODO: Either this is needed for rasterToCoverages or remove it.
   this.crs = AbstractGridFormat.getDefaultCRS
@@ -79,7 +84,7 @@ class GeoMesaCoverageReader(val url: String, hints: Hints) extends AbstractGridC
 
   def read(parameters: Array[GeneralParameterValue]): GridCoverage2D = {
     logger.debug(s"READ: $parameters")
-    val params = new GeoMesaCoverageQueryParams(parameters)
+    val params = new GeoMesaCoverageQueryParams(parameters,coverageName)
     val rq = params.toRasterQuery
     rastersToCoverage(ars.getRasters(rq), params)
   }

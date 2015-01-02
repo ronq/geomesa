@@ -19,6 +19,7 @@ package org.locationtech.geomesa.plugin.wcs
 import org.geotools.coverage.grid.GridGeometry2D
 import org.geotools.coverage.grid.io.AbstractGridFormat
 import org.geotools.parameter.Parameter
+import org.locationtech.geomesa.plugin.wcs.GeoMesaCoverageReader._
 import org.locationtech.geomesa.raster.data.RasterQuery
 import org.locationtech.geomesa.utils.geohash.{BoundingBox, Bounds}
 import org.opengis.parameter.GeneralParameterValue
@@ -28,8 +29,9 @@ import org.opengis.parameter.GeneralParameterValue
  * out the gridGeometry, envelope, height and width, resolution, and bounding box from the query
  * parameters. These are then used to query Accumulo and retrieve out the correct raster information.
  * @param parameters the Array of GeneralParameterValues from the GeoMesaCoverageReader read() function.
+ * @param coverageName: the name of the coverage
  */
-class GeoMesaCoverageQueryParams(parameters: Array[GeneralParameterValue]) {
+class GeoMesaCoverageQueryParams(parameters: Array[GeneralParameterValue], coverageName:String) {
   val paramsMap = parameters.map { gpv => (gpv.getDescriptor.getName.getCode, gpv) }.toMap
   val gridGeometry = paramsMap(AbstractGridFormat.READ_GRIDGEOMETRY2D.getName.toString)
                      .asInstanceOf[Parameter[GridGeometry2D]].getValue
@@ -39,9 +41,7 @@ class GeoMesaCoverageQueryParams(parameters: Array[GeneralParameterValue]) {
   val height = gridGeometry.getGridRange2D.getHeight
   val resX = (envelope.getMaximum(0) - envelope.getMinimum(0)) / width
   val resY = (envelope.getMaximum(1) - envelope.getMinimum(1)) / height
-  val accResolution = Option(paramsMap(GeoMesaCoverageFormat.RESOLUTION.getName.toString))
-                      .getOrElse(GeoMesaCoverageFormat.RESOLUTION.getDefaultValue)
-                      .asInstanceOf[Parameter[String]].getValue.toDouble
+  val accResolution = determineQueryResolution(coverageName, resX, resY)
   val min = Array(Math.max(envelope.getMinimum(0), -180) + .00000001,
                   Math.max(envelope.getMinimum(1), -90) + .00000001)
   val max = Array(Math.min(envelope.getMaximum(0), 180) - .00000001,
@@ -49,4 +49,16 @@ class GeoMesaCoverageQueryParams(parameters: Array[GeneralParameterValue]) {
   val bbox = BoundingBox(Bounds(min(0), max(0)), Bounds(min(1), max(1)))
 
   def toRasterQuery: RasterQuery = RasterQuery(bbox, accResolution, None, None)
+  // determine the resolution to use in the query by looking for the hint in the coverageName,
+  // and if not present, using the resolution of the request and finding a match in the table
+  def determineQueryResolution(coverageName:String,resXRequest:Double, resYRequest:Double): Double = {
+    // parse the coverageName for a resolution component
+    val coverageNameFORMAT(tableName, resolutionTag) = coverageName
+    // if found return the resolution component
+    resolutionTag.toDouble
+    // if not, select from the request resolutions and take the smallest of the two
+  }
+  // using the request resolution, find the best match in the table (closest but no lower in resolution to data present
+  // in the table
+  def matchAvailableResolutions(resXRequest:Double, resYRequest:Double): Double = ???
 }
