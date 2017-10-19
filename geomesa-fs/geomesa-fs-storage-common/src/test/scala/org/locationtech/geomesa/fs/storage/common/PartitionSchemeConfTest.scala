@@ -92,16 +92,12 @@ class PartitionSchemeConfTest extends Specification with AllExpectations {
       val sftConfig = SimpleFeatureTypes.toConfigString(sft)
 
       val dsParams: java.util.Map[String, java.io.Serializable] = Map ("fs.encoding" -> "parquet",
-        "fs.path" -> "s3a://foo/geomesa",
-        "fs.options.sft.conf" -> sftConfig,
-        "fs.options.sft.name" -> "test",
         "fs.partition-scheme.name" -> "datetime",
         "fs.partition-scheme.opts.datetime-format" -> "yyyy/DDD/HH/mm",
         "fs.partition-scheme.opts.step-unit" -> "MINUTES",
         "fs.partition-scheme.opts.step" -> "15",
         "fs.partition-scheme.opts.dtg-attribute" -> "dtg",
-        "fs.partition-scheme.opts.leaf-storage" -> "true" ,
-        "geomesa.feature" -> "test")
+        "fs.partition-scheme.opts.leaf-storage" -> "true"  )
 
       val scheme = PartitionScheme(sft, dsParams)
       scheme must beAnInstanceOf[DateTimeScheme]

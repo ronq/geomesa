@@ -108,7 +108,7 @@ class ParquetFileSystemStorage(root: Path,
     val typeName = sft.getTypeName
     if (!typeNames.contains(typeName)) {
       MetadataCache.put((root, typeName), {
-          val metadata = createFileMetadata(sft,scheme)
+          val metadata = createFileMetadata(sft, scheme)
           typeNames += typeName
           metadata
       })
