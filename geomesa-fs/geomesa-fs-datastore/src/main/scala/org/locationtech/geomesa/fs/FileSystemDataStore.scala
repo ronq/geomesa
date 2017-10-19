@@ -24,7 +24,6 @@ import org.opengis.feature.simple.SimpleFeatureType
 
 import scala.collection.JavaConverters._
 
-// TODO: refactor to use the GeoMesaDataStore, since that features smarter handling of existing FeatureTypes
 class FileSystemDataStore(fs: FileSystem,
                           val root: Path,
                           val storage: FileSystemStorage,
@@ -41,8 +40,8 @@ class FileSystemDataStore(fs: FileSystem,
       .getOrElse(throw new RuntimeException(s"Could not find feature type ${entry.getTypeName}"))
     new FileSystemFeatureStore(entry, Query.ALL, fs, storage, readThreads)
   }
-  override def createSchema(sft: SimpleFeatureType): Unit = {
-    if ( !storage.listTypeNames.contains(sft.getTypeName) ) storage.createNewFeatureType(sft) }
+  override def createSchema(sft: SimpleFeatureType): Unit =
+    if ( !storage.listTypeNames.contains(sft.getTypeName) ) storage.createNewFeatureType(sft)
 }
 
 class FileSystemDataStoreFactory extends DataStoreFactorySpi {

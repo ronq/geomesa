@@ -38,22 +38,22 @@ class PartitionSchemeConfTest extends Specification with AllExpectations {
           | }
         """.stripMargin
 
-      val sft = SimpleFeatureTypes.createType ("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
-      val scheme = PartitionScheme (sft, ConfigFactory.parseString (conf))
+      val sft = SimpleFeatureTypes.createType("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
+      val scheme = PartitionScheme(sft, ConfigFactory.parseString(conf))
 
-      scheme must not (beNull)
-      scheme must beAnInstanceOf [CompositeScheme]
+      scheme must not(beNull)
+      scheme must beAnInstanceOf[CompositeScheme]
     }
 
     "load, serialize, deserialize" >> {
-      val sft = SimpleFeatureTypes.createType ("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
-      val scheme = CommonSchemeLoader.build ("daily,z2-2bit", sft)
-      scheme must beAnInstanceOf [CompositeScheme]
+      val sft = SimpleFeatureTypes.createType("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
+      val scheme = CommonSchemeLoader.build("daily,z2-2bit", sft)
+      scheme must beAnInstanceOf[CompositeScheme]
 
       val schemeStr = scheme.toString
 
-      val scheme2 = PartitionScheme.apply (sft, schemeStr)
-      scheme2 must beAnInstanceOf [CompositeScheme]
+      val scheme2 = PartitionScheme.apply(sft, schemeStr)
+      scheme2 must beAnInstanceOf[CompositeScheme]
     }
 
     "load dtg, geom, step, and leaf defaults" >> {
@@ -69,42 +69,42 @@ class PartitionSchemeConfTest extends Specification with AllExpectations {
           | }
         """.stripMargin
 
-      val sft = SimpleFeatureTypes.createType ("test", "name:String,age:Int,foo:Date,*bar:Point:srid=4326")
-      val scheme = PartitionScheme (sft, ConfigFactory.parseString (conf))
+      val sft = SimpleFeatureTypes.createType("test", "name:String,age:Int,foo:Date,*bar:Point:srid=4326")
+      val scheme = PartitionScheme(sft, ConfigFactory.parseString(conf))
 
-      scheme must not (beNull)
-      scheme must beAnInstanceOf [CompositeScheme]
+      scheme must not(beNull)
+      scheme must beAnInstanceOf[CompositeScheme]
 
       scheme.isLeafStorage must beTrue
       val opts = scheme.getOptions
       import PartitionOpts._
-      opts.get (GeomAttribute) mustEqual "bar"
-      opts.get (DtgAttribute) mustEqual "foo"
-      opts.get (StepOpt).toInt mustEqual 1
-      opts.get (LeafStorage).toBoolean must beTrue
+      opts.get(GeomAttribute) mustEqual "bar"
+      opts.get(DtgAttribute) mustEqual "foo"
+      opts.get(StepOpt).toInt mustEqual 1
+      opts.get(LeafStorage).toBoolean must beTrue
     }
 
-    "load parameters from DSParameters" >> {
+    "load parameters from DataStore parameters" >> {
       import scala.collection.JavaConversions._
-      val sft = SimpleFeatureTypes.createType ("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
-      val partitionScheme = new DateTimeScheme (DateTimeScheme.Formats.Daily, ChronoUnit.DAYS, 1, "dtg", false)
-      PartitionScheme.addToSft (sft, partitionScheme)
-      val sftConfig = SimpleFeatureTypes.toConfigString (sft)
+      val sft = SimpleFeatureTypes.createType("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
+      val partitionScheme = new DateTimeScheme(DateTimeScheme.Formats.Daily, ChronoUnit.DAYS, 1, "dtg", false)
+      PartitionScheme.addToSft(sft, partitionScheme)
+      val sftConfig = SimpleFeatureTypes.toConfigString(sft)
 
       val dsParams: java.util.Map[String, java.io.Serializable] = Map ("fs.encoding" -> "parquet",
-        "fs.path" -> "s3a://ronq-emr-test2/geomesa",
+        "fs.path" -> "s3a://foo/geomesa",
         "fs.options.sft.conf" -> sftConfig,
-        "fs.options.sft.name" -> "exactAIS",
+        "fs.options.sft.name" -> "test",
         "fs.partition-scheme.name" -> "datetime",
         "fs.partition-scheme.opts.datetime-format" -> "yyyy/DDD/HH/mm",
         "fs.partition-scheme.opts.step-unit" -> "MINUTES",
         "fs.partition-scheme.opts.step" -> "15",
         "fs.partition-scheme.opts.dtg-attribute" -> "dtg",
         "fs.partition-scheme.opts.leaf-storage" -> "true" ,
-        "geomesa.feature" -> "exactAIS")
+        "geomesa.feature" -> "test")
 
-      val scheme = PartitionScheme (sft, dsParams)
-      scheme must beAnInstanceOf [DateTimeScheme]
+      val scheme = PartitionScheme(sft, dsParams)
+      scheme must beAnInstanceOf[DateTimeScheme]
     }
   }
 }

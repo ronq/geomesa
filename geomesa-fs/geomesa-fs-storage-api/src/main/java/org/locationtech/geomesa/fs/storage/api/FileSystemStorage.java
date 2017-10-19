@@ -21,6 +21,7 @@ public interface FileSystemStorage {
 
     void createNewFeatureType(SimpleFeatureType sft, PartitionScheme scheme);
     void createNewFeatureType(SimpleFeatureType sft);
+    
     PartitionScheme getPartitionScheme(String typeName);
 
     List<String> listPartitions(String typeName);

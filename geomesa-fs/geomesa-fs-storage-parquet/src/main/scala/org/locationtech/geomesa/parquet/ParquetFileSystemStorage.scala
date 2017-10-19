@@ -123,12 +123,11 @@ class ParquetFileSystemStorage(root: Path,
   }
 
   override def createNewFeatureType(sft: SimpleFeatureType): Unit = {
-    // assume that partitions in the Configuration take precedence
-    val partitionScheme= Try (PartitionScheme(sft, dsParams) ) match {
+    // assume that partitions in the DataStore Configuration take precedence
+    val partitionScheme = Try(PartitionScheme(sft, dsParams) ) match {
       case Success(ps) => ps
       // fallback to using the SFT User Data
-      case Failure(e) => logger.info(s"Scheme Failure, reason: ${e.getMessage}")
-        PartitionScheme.extractFromSft(sft)
+      case Failure(e) => PartitionScheme.extractFromSft(sft)
     }
     createNewFeatureType(sft, partitionScheme)
   }
@@ -296,7 +295,7 @@ class ParquetFileSystemStorage(root: Path,
     cleanBackups(typeName)
 
     // Recreate a new metadata file
-    val newMetadata = createFileMetadata(sft,scheme)
+    val newMetadata = createFileMetadata(sft, scheme)
     MetadataCache.invalidate((root, typeName))
     MetadataCache.put((root, typeName), newMetadata)
 

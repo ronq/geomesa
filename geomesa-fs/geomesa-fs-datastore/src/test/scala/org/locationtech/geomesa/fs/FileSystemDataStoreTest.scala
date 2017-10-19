@@ -106,6 +106,7 @@ class FileSystemDataStoreTest extends Specification {
       ds2.createSchema(sameSft) must not(throwA[Throwable])
     }
 
+    // this is occurs upon SparkSQL writes from other datastores
     "call create schema on existing type without affiliated user data" >> {
        val ds2 = DataStoreFinder.getDataStore(Map(
         "fs.path" -> dir.getPath,
@@ -114,7 +115,8 @@ class FileSystemDataStoreTest extends Specification {
       // It should be noted that no PartitionScheme is set in the SFT here
       ds2.createSchema(sameSft) must not(throwA[Throwable])
     }
-
+    
+    // this is occurs upon SparkSQL writes from other datastores
      "call create schema on new type without affiliated user data, using the data store parameters to set partitions" >> {
        val ds2 = DataStoreFinder.getDataStore(Map(
         "fs.path" -> dir.getPath,
