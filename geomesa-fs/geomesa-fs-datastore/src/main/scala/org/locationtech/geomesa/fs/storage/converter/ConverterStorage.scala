@@ -71,6 +71,9 @@ class ConverterStorage(root: Path,
   override def listFeatureTypes(): util.List[SimpleFeatureType] = List(sft)
 
   override def createNewFeatureType(sft: SimpleFeatureType, partitionScheme: PartitionScheme): Unit =
+    createNewFeatureType(sft)
+
+  override def createNewFeatureType(sft: SimpleFeatureType): Unit =
     throw new UnsupportedOperationException("Converter Storage does not support creation of new feature types")
 
   override def getFeatureType(name: String): SimpleFeatureType =

@@ -106,6 +106,32 @@ class FileSystemDataStoreTest extends Specification {
       ds2.createSchema(sameSft) must not(throwA[Throwable])
     }
 
+    "call create schema on existing type without affiliated user data" >> {
+       val ds2 = DataStoreFinder.getDataStore(Map(
+        "fs.path" -> dir.getPath,
+        "fs.encoding" -> "parquet")).asInstanceOf[FileSystemDataStore]
+      val sameSft = SimpleFeatureTypes.createType("test", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
+      // It should be noted that no PartitionScheme is set in the SFT here
+      ds2.createSchema(sameSft) must not(throwA[Throwable])
+    }
+
+     "call create schema on new type without affiliated user data, using the data store parameters to set partitions" >> {
+       val ds2 = DataStoreFinder.getDataStore(Map(
+        "fs.path" -> dir.getPath,
+        "fs.encoding" -> "parquet",
+        "fs.partition-scheme.name" -> "datetime",
+        "fs.partition-scheme.opts.datetime-format" -> "yyyy/DDD/HH/mm",
+        "fs.partition-scheme.opts.step-unit" -> "MINUTES",
+        "fs.partition-scheme.opts.step" -> "15",
+        "fs.partition-scheme.opts.dtg-attribute" -> "dtg",
+        "fs.partition-scheme.opts.leaf-storage" -> "true" 
+       )).asInstanceOf[FileSystemDataStore]
+      val newSft = SimpleFeatureTypes.createType("test2", "name:String,age:Int,dtg:Date,*geom:Point:srid=4326")
+      // It should be noted that no PartitionScheme is set in the SFT here
+      ds2.createSchema(newSft) must not(throwA[Throwable])
+    }
+
+
     "support transforms" >> {
       val ds = DataStoreFinder.getDataStore(Map(
         "fs.path" -> dir.getPath,

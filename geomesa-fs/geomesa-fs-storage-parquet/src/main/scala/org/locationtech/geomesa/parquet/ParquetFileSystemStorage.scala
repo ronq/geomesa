@@ -32,6 +32,7 @@ import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 class ParquetFileSystemStorageFactory extends FileSystemStorageFactory {
   override def canProcess(params: util.Map[String, io.Serializable]): Boolean = {
@@ -96,20 +97,18 @@ class ParquetFileSystemStorage(root: Path,
   override def getFeatureType(typeName: String): SimpleFeatureType =
     metadata(typeName).getSimpleFeatureType
 
-  private def createFileMetadata(sft: SimpleFeatureType) = {
+  private def createFileMetadata(sft: SimpleFeatureType, scheme: PartitionScheme) = {
     val typeName = sft.getTypeName
     val typePath = new Path(root, typeName)
-    val scheme = PartitionScheme.extractFromSft(sft)
     val metaPath = new Path(typePath, MetadataFileName)
     FileMetadata.create(fs, metaPath, sft, ParquetEncoding, scheme, conf)
   }
 
   override def createNewFeatureType(sft: SimpleFeatureType, scheme: PartitionScheme): Unit = {
     val typeName = sft.getTypeName
-
     if (!typeNames.contains(typeName)) {
       MetadataCache.put((root, typeName), {
-          val metadata = createFileMetadata(sft)
+          val metadata = createFileMetadata(sft,scheme)
           typeNames += typeName
           metadata
       })
@@ -121,6 +120,17 @@ class ParquetFileSystemStorage(root: Path,
           s"equivalent to existing descriptor ${existing(i).getLocalName} at index $i")
       }
     }
+  }
+
+  override def createNewFeatureType(sft: SimpleFeatureType): Unit = {
+    // assume that partitions in the Configuration take precedence
+    val partitionScheme= Try (PartitionScheme(sft, dsParams) ) match {
+      case Success(ps) => ps
+      // fallback to using the SFT User Data
+      case Failure(e) => logger.info(s"Scheme Failure, reason: ${e.getMessage}")
+        PartitionScheme.extractFromSft(sft)
+    }
+    createNewFeatureType(sft, partitionScheme)
   }
 
   override def listFeatureTypes: util.List[SimpleFeatureType] = typeNames.map(getFeatureType)
@@ -286,7 +296,7 @@ class ParquetFileSystemStorage(root: Path,
     cleanBackups(typeName)
 
     // Recreate a new metadata file
-    val newMetadata = createFileMetadata(sft)
+    val newMetadata = createFileMetadata(sft,scheme)
     MetadataCache.invalidate((root, typeName))
     MetadataCache.put((root, typeName), newMetadata)
 

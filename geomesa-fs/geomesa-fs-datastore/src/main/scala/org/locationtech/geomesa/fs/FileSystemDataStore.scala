@@ -18,13 +18,13 @@ import org.geotools.data.store.{ContentDataStore, ContentEntry, ContentFeatureSo
 import org.geotools.data.{DataAccessFactory, DataStore, DataStoreFactorySpi, Query}
 import org.geotools.feature.NameImpl
 import org.locationtech.geomesa.fs.storage.api.{FileSystemStorage, FileSystemStorageFactory}
-import org.locationtech.geomesa.fs.storage.common.PartitionScheme
 import org.locationtech.geomesa.utils.geotools.GeoMesaParam
 import org.opengis.feature.`type`.Name
 import org.opengis.feature.simple.SimpleFeatureType
 
 import scala.collection.JavaConverters._
 
+// TODO: refactor to use the GeoMesaDataStore, since that features smarter handling of existing FeatureTypes
 class FileSystemDataStore(fs: FileSystem,
                           val root: Path,
                           val storage: FileSystemStorage,
@@ -41,10 +41,8 @@ class FileSystemDataStore(fs: FileSystem,
       .getOrElse(throw new RuntimeException(s"Could not find feature type ${entry.getTypeName}"))
     new FileSystemFeatureStore(entry, Query.ALL, fs, storage, readThreads)
   }
-
   override def createSchema(sft: SimpleFeatureType): Unit = {
-    storage.createNewFeatureType(sft, PartitionScheme.extractFromSft(sft))
-  }
+    if ( !storage.listTypeNames.contains(sft.getTypeName) ) storage.createNewFeatureType(sft) }
 }
 
 class FileSystemDataStoreFactory extends DataStoreFactorySpi {

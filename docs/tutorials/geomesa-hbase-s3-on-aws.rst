@@ -217,3 +217,26 @@ Within the Spark shell, you can connect to GDELT and issues some queries.
    scala> spark.sql("SELECT globalEventId,geom,dtg FROM gdelt LIMIT 5").show()
 
 
+Connecting to External HBase Clusters Backed By S3
+---------------------------------------------------
+
+To use a EMR cluster to connect to an existing, external HBase Cluster first follow the above instructions to setup the new cluster and install GeoMesa.
+
+The next step is to obtain the hbase-site.xml for the external HBase Cluster, copy to the new EMR cluster and overwrite the copy in /opt/geomesa-hbase_2.11-${VERSION}/conf/ . At this point you may run the geomesa-hbase command line tools.
+
+If you wish to execute SQL queries using Spark, you must first zip the hbase-site.xml file for the external cluster:
+
+.. code-block:: shell
+
+    zip  hbase-site.xml.zip hbase-site.xml
+
+and copy the zip file to /opt/geomesa/conf/ then add the zipped configuration file to the Spark classpath
+  .. code-block:: shell
+
+    $ JARS=file:///opt/geomesa/dist/spark/geomesa-hbase-spark-runtime_2.11-${VERSION}.jar,file:///opt/geomesa/conf/hbase-site.xml.zip
+
+Then start up the Spark shell
+
+.. code-block:: shell
+
+    $ spark-shell --jars $JARS

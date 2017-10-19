@@ -191,7 +191,8 @@ class GeoMesaDataSource extends DataSourceRegister
         SparkUtils.row2Sf(nameMappings, r, builder, fidFn(r))
       }
     })
-
+    val num = rddToSave.count()
+    logger.info(s"Have this many entries in RDD: $num ")
     GeoMesaSpark(parameters).save(rddToSave, parameters, newFeatureName)
 
     GeoMesaRelation(sqlContext, sft, data.schema, parameters)
