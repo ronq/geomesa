@@ -8,19 +8,15 @@
 
 package org.locationtech.geomesa.fs
 
-import java.util.concurrent.atomic.AtomicLong
-
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.FileSystem
 import org.geotools.data.simple.DelegateSimpleFeatureReader
 import org.geotools.data.store.{ContentEntry, ContentFeatureStore}
-import org.geotools.data.{FeatureReader, FeatureWriter, Query}
+import org.geotools.data.{FeatureReader, Query}
 import org.geotools.feature.collection.DelegateSimpleFeatureIterator
 import org.geotools.geometry.jts.ReferencedEnvelope
-import org.locationtech.geomesa.features.ScalaSimpleFeature
 import org.locationtech.geomesa.fs.storage.api.{FileSystemStorage, FileSystemWriter}
 import org.locationtech.geomesa.index.planning.QueryPlanner
-import org.locationtech.geomesa.utils.io.CloseWithLogging
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
 
 class FileSystemFeatureStore(entry: ContentEntry,
@@ -30,49 +26,13 @@ class FileSystemFeatureStore(entry: ContentEntry,
                              readThreads: Int) extends ContentFeatureStore(entry, query) with LazyLogging {
   private val _sft = storage.getFeatureType(entry.getTypeName)
 
-  override def getWriterInternal(query: Query, flags: Int): FeatureWriter[SimpleFeatureType, SimpleFeature] = {
+  override def getWriterInternal(query: Query, flags: Int): FileSystemFeatureWriter = {
     require(flags != 0, "no write flags set")
     require((flags | WRITER_ADD) == WRITER_ADD, "Only append supported")
 
-    new FeatureWriter[SimpleFeatureType, SimpleFeature] {
-      private val typeName = query.getTypeName
-
-      private val writers = scala.collection.mutable.Map.empty[String, FileSystemWriter]
-
-      private val sft = _sft
-
-      private val featureIds = new AtomicLong(0)
-      private var feature: SimpleFeature = _
-
-      override def getFeatureType: SimpleFeatureType = sft
-
-      override def hasNext: Boolean = false
-
-      override def next(): SimpleFeature = {
-        feature = new ScalaSimpleFeature(sft, featureIds.getAndIncrement().toString)
-        feature
-      }
-
-      override def write(): Unit = {
-        val partition = storage.getPartitionScheme(typeName).getPartitionName(feature)
-        val writer = writers.getOrElseUpdate(partition, storage.getWriter(typeName, partition))
-        writer.write(feature)
-        feature = null
-      }
-
-      override def remove(): Unit = throw new NotImplementedError()
-
-      override def close(): Unit = {
-        writers.foreach { case (_, writer) =>
-          writer.flush()
-          CloseWithLogging(writer)
-        }
-        try {
-          storage.updateMetadata(typeName)
-        } catch {
-          case e: Throwable => logger.error(s"Error updating metadata for type $typeName", e)
-        }
-      }
+    val thePartitionScheme = storage.getPartitionScheme(entry.getTypeName)
+    new FileSystemFeatureWriter(_sft, thePartitionScheme ) {
+        override def newWriter(typeName: String, partition: String): FileSystemWriter =  storage.getWriter(typeName, partition)
     }
   }
 

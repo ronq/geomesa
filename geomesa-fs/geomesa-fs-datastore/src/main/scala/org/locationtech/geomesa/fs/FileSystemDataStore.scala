@@ -12,6 +12,7 @@ import java.awt.RenderingHints
 import java.util.ServiceLoader
 import java.{io, util}
 
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.geotools.data.store.{ContentDataStore, ContentEntry, ContentFeatureSource}
@@ -28,7 +29,7 @@ class FileSystemDataStore(fs: FileSystem,
                           val root: Path,
                           val storage: FileSystemStorage,
                           readThreads: Int,
-                          conf: Configuration) extends ContentDataStore {
+                          conf: Configuration) extends ContentDataStore with LazyLogging {
   import scala.collection.JavaConversions._
 
   override def createTypeNames(): util.List[Name] = {
@@ -42,6 +43,16 @@ class FileSystemDataStore(fs: FileSystem,
   }
   override def createSchema(sft: SimpleFeatureType): Unit =
     if ( !storage.listTypeNames.contains(sft.getTypeName) ) storage.createNewFeatureType(sft)
+
+  override def dispose(): Unit = {
+    val typeNames = storage.listTypeNames()
+    typeNames.foreach { typeName =>
+      try { storage.updateMetadata (typeName) } catch {
+        case e: Throwable => logger.error (s"Error updating metadata for type $typeName", e)
+      }
+    }
+    super.dispose()
+  }
 }
 
 class FileSystemDataStoreFactory extends DataStoreFactorySpi {

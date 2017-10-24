@@ -18,10 +18,11 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.Job
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 import org.apache.parquet.hadoop.ParquetInputFormat
-import org.apache.spark.SparkContext
+import org.apache.spark.{RangePartitioner, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.geotools.data.{DataStoreFinder, Query, Transaction}
-import org.locationtech.geomesa.fs.{FileSystemDataStore, FsQueryPlanning}
+import org.locationtech.geomesa.fs.storage.api.PartitionScheme
+import org.locationtech.geomesa.fs.{FileSystemDataStore, FileSystemFeatureWriter, FsQueryPlanning}
 import org.locationtech.geomesa.index.planning.QueryPlanner
 import org.locationtech.geomesa.parquet.{FilterConverter, ParquetFileSystemStorageFactory, SFParquetInputFormat, SimpleFeatureReadSupport}
 import org.locationtech.geomesa.spark.{SpatialRDD, SpatialRDDProvider}
@@ -90,23 +91,40 @@ class ParquetFileSystemRDD extends SpatialRDDProvider with LazyLogging {
   override def save(rdd: RDD[SimpleFeature], params: Map[String, String], typeName: String): Unit = {
     import scala.collection.JavaConversions._
     val ds = DataStoreFinder.getDataStore(params).asInstanceOf[FileSystemDataStore]
+    val partition: PartitionScheme = ds.storage.getPartitionScheme(typeName)
     try {
       require(ds.getSchema(typeName) != null,
         "Feature type must exist before calling save.  Call createSchema on the DataStore first.")
     } finally {
       ds.dispose()
     }
+    // in order to prevent the generation of countless FeatureWriters (there is one per INDEXING partition)
+    // shuffle the data so that a given indexing partition is completely contained in a single RDD partition
+    // furthermore, as there may be many index partitions per RDD partition, sort by the index partition
+    // failure to do the above may result in Out Of Memory errors at finer partitioning schemes
 
-    rdd.foreachPartition { iter =>
+
+    // key by indexing partition
+    val keyyedRDD = rdd.map{sf => partition.getPartitionName(sf) -> sf}
+    // TODO: Investigate if index partition <--> rdd partition would be a great idea
+    val newPartitions = rdd.getNumPartitions
+    // using the range partitioner will attempt to balance the partitions by portion size, not number of index partitions
+    val indexPartitionPartitioner = new RangePartitioner(newPartitions, keyyedRDD)
+    val sortedParts = keyyedRDD.repartitionAndSortWithinPartitions(indexPartitionPartitioner)
+    // each RDD partition now contains an iterable of SimpleFeatures, indexed and sorted by key
+    sortedParts.foreachPartition { iter: Iterator[(String, SimpleFeature)] =>
       val ds = DataStoreFinder.getDataStore(params).asInstanceOf[FileSystemDataStore]
-      val featureWriter = ds.getFeatureWriterAppend(typeName, Transaction.AUTO_COMMIT)
+      val featureWriter = ds.getFeatureWriterAppend(typeName, Transaction.AUTO_COMMIT).asInstanceOf[FileSystemFeatureWriter]
+      // iterate over the contents of the RDD partition.
+      // when moving to a new indexing partition key, the old writer should be flushed
       try {
-        iter.foreach { rawFeature =>
+        iter.foreach { case (partition: String, rawFeature: SimpleFeature) =>
           FeatureUtils.copyToWriter(featureWriter, rawFeature, useProvidedFid = true)
-          featureWriter.write()
+          featureWriter.serialPartitionWrite()
         }
       } finally {
         IOUtils.closeQuietly(featureWriter)
+        // update the metadata and close
         ds.dispose()
       }
     }
